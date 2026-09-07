@@ -1,0 +1,6 @@
+{
+  "name": "My Medicine Cabinet",
+  "description": "Home Medication Inventory App",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

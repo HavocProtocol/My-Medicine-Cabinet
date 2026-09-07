@@ -1,0 +1,17 @@
+--- app/src/main/java/com/example/data/AppDao.kt
++++ app/src/main/java/com/example/data/AppDao.kt
+@@ -19,6 +19,15 @@
+     @Insert(onConflict = OnConflictStrategy.IGNORE)
+     suspend fun insertMedicineCategory(crossRef: MedicineCategoryCrossRef)
+ 
++    @Insert(onConflict = OnConflictStrategy.IGNORE)
++    suspend fun insertAlert(alert: Alert)
++
++    @Query("SELECT * FROM alerts WHERE isRead = 0 ORDER BY triggerDate DESC")
++    fun getUnreadAlerts(): Flow<List<Alert>>
++
++    @Query("UPDATE alerts SET isRead = 1 WHERE id = :id")
++    suspend fun markAlertAsRead(id: Int)
++
+     @Query("SELECT * FROM categories")
+     fun getAllCategories(): Flow<List<Category>>

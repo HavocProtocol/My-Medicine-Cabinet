@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">My Medicine Cabinet</string>
+    
+    <!-- Dashboard -->
+    <string name="search_placeholder">Search by trade or active ingredient</string>
+    <string name="overview">Overview</string>
+    <string name="total_medicines">Total Medicines</string>
+    <string name="expiring_soon">Expiring Soon</string>
+    <string name="expired_medicines">Expired</string>
+    <string name="quick_actions">Quick Actions</string>
+    <string name="add_medicine">Add Medicine</string>
+    <string name="scan_barcode">Scan Barcode</string>
+    <string name="categories">Categories</string>
+    <string name="ai_voice_search">AI Voice Search</string>
+    <string name="export_print">Export &amp; Print</string>
+    <string name="ai_search">AI Search</string>
+    <string name="medicine_list">Medicine List</string>
+    <string name="no_medicines_yet">No medicines recorded yet</string>
+    <string name="notifications">Notifications</string>
+
+    <!-- General Navigation -->
+    <string name="back">Back</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="delete">Delete</string>
+    <string name="edit">Edit</string>
+    <string name="add">Add</string>
+    <string name="next">Next</string>
+    <string name="start">Get Started</string>
+    <string name="finish_setup">Finish Setup</string>
+    <string name="share">Share</string>
+
+    <!-- Add Medicine -->
+    <string name="add_medicine_title">Add New Medicine</string>
+    <string name="trade_name">Trade Name *</string>
+    <string name="scientific_name">Scientific Name / Active Ingredient</string>
+    <string name="strength">Strength / Dosage</string>
+    <string name="dosage_form">Dosage Form</string>
+    <string name="remaining_quantity">Remaining Quantity</string>
+    <string name="manufacturer">Manufacturer</string>
+    <string name="storage_location">Storage Location</string>
+    <string name="needs_refrigeration">Requires Refrigeration?</string>
+    <string name="save_medicine_button">Save Medicine</string>
+    <string name="form_tablets">Tablets</string>
+    <string name="form_capsules">Capsules</string>
+    <string name="form_syrup">Syrup</string>
+    <string name="form_cream">Cream / Ointment</string>
+    <string name="form_spray">Spray</string>
+    <string name="form_drops">Drops</string>
+    <string name="form_injections">Injections</string>
+    <string name="form_other">Other</string>
+
+    <!-- Categories Screen -->
+    <string name="categories_title">Categories</string>
+    <string name="no_categories">No categories currently available</string>
+    <string name="add_new_category">Add New Category</string>
+    <string name="category_name">Category Name</string>
+
+    <!-- Med Info & Detail -->
+    <string name="med_info_title">Medicine Information</string>
+    <string name="medicine_detail_title">Medicine Details</string>
+    <string name="medicine_not_found">Medicine not found</string>
+    <string name="medical_disclaimer_banner">This information is for guidance only and is not a prescription. The app does not replace consulting a doctor or pharmacist.</string>
+    <string name="expired_warning">Do not use expired medication. Consult a pharmacist for safe disposal.</string>
+    <string name="ask_med_placeholder">Ask about this medicine (dosage, indications, side effects...)</string>
+    <string name="send_question">Send Question</string>
+    <string name="emergency_alert">Emergency Alert</string>
+    <string name="source_label">Source: </string>
+    <string name="last_updated">Last Updated: </string>
+    <string name="expiry_date">Expiry Date</string>
+    <string name="log_used_quantity">Log Used Quantity</string>
+    <string name="add_new_pack">Add New Pack</string>
+    <string name="share_or_print">Share or Print</string>
+    <string name="indications">Indications</string>
+    <string name="warnings">Warnings</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+
+    <!-- Notifications Screen -->
+    <string name="notifications_title">Notifications &amp; Alerts</string>
+    <string name="no_notifications">No new notifications</string>
+    <string name="mark_all_read">Mark All as Read</string>
+    <string name="expired_alert_title">Expired Medicine</string>
+    <string name="expiring_soon_alert_title">Expiring Soon</string>
+    <string name="medicine_label">Medicine: </string>
+    <string name="date_label">Date: </string>
+
+    <!-- Settings Screen -->
+    <string name="settings">Settings &amp; Sync</string>
+    <string name="language">Language</string>
+    <string name="change_language">Change App Language</string>
+    <string name="theme_mode">App Theme</string>
+    <string name="theme_system">System Default</string>
+    <string name="theme_light">Light Mode</string>
+    <string name="theme_dark">Dark Mode</string>
+    <string name="local_llm_settings">Local LLM Configuration</string>
+    <string name="local_llm_desc">Connect to a local AI model running on your PC (such as Ollama or LM Studio).</string>
+    <string name="local_llm_host">Host URL</string>
+    <string name="local_llm_model">Model Name</string>
+    <string name="test_connection">Test Connection</string>
+    <string name="connection_success">Successfully connected to Local LLM!</string>
+    <string name="connection_failed">Connection failed: Ensure Ollama or LM Studio is running on your PC.</string>
+    <string name="offline_mode_active">Offline Mode Active</string>
+    <string name="offline_mode_desc">All data is saved locally on your device and available without internet.</string>
+    <string name="cloud_sync">Cloud Sync</string>
+    <string name="cloud_sync_desc">Backup your data to the cloud.</string>
+    <string name="sync_status">Sync Status: </string>
+    <string name="sync_now">Sync Now</string>
+
+    <!-- AI Voice & Search -->
+    <string name="voice_chat_title">AI Voice Search</string>
+    <string name="mic_permission_needed">Please grant microphone permission to use voice search.</string>
+    <string name="grant_permission">Grant Permission</string>
+    <string name="tap_to_speak">Tap to talk with Local LLM</string>
+    <string name="listening">Listening...</string>
+    <string name="processing">Processing with Local LLM...</string>
+    <string name="speaking">Speaking response...</string>
+    <string name="connected_to_local_llm">Connected to Local LLM</string>
+    <string name="not_connected_local_llm">Not Connected to Local LLM</string>
+    <string name="type_message_placeholder">Or type your question here...</string>
+    <string name="ai_search_title">AI Search</string>
+    <string name="ai_search_subtitle">Search for medicine info and health guidance:</string>
+    <string name="search_button">Search</string>
+    <string name="use_local_llm">Use Local LLM (PC)</string>
+    <string name="use_cloud_ai">Use Cloud Gemini AI</string>
+    <string name="sources">Sources:</string>
+
+    <!-- Print & Export -->
+    <string name="export_print_title">Export &amp; Print</string>
+    <string name="export_csv_desc">Export your medicine data as an Excel (CSV) file for viewing and analysis.</string>
+    <string name="export_csv_btn">Export as Excel (CSV)</string>
+    <string name="export_pdf_desc">Export your medicine data as a PDF document for printing.</string>
+    <string name="export_pdf_btn">Export as PDF</string>
+    <string name="export_success">File exported successfully</string>
+    <string name="export_error">An error occurred during export</string>
+
+    <!-- Scan Barcode -->
+    <string name="scan_title">Scan Barcode</string>
+    <string name="camera_permission_needed">Camera permission is required to scan barcodes.</string>
+    <string name="checking_sfda">Looking up medicine database...</string>
+    <string name="scanned_successfully">Scanned successfully:</string>
+    <string name="scan_another">Scan Another Barcode</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title">My Medicine Cabinet</string>
+    <string name="onboarding_desc">Digital medicine cabinet for home medication management: record medicines, track expiry dates, receive early alerts, and export lists.</string>
+    <string name="choose_country">Choose Your Country</string>
+    <string name="country_desc">Product names and sources may vary by country.</string>
+    <string name="privacy_medical_title">Privacy &amp; Medical Disclaimer</string>
+    <string name="medical_alert_notice">Medical Disclaimer: This app is not a substitute for professional medical advice. It does not diagnose diseases or prescribe medications. Always consult a healthcare professional before taking medications.</string>
+    <string name="agree_privacy">I agree to the privacy policy (data is stored locally and encrypted).</string>
+    <string name="understand_medical">I understand the medical disclaimer and that this app does not replace a doctor or pharmacist.</string>
+
+    <!-- Tutorial -->
+    <string name="tutorial_title">App Tutorial</string>
+    <string name="tutorial_desc">Learn how to use the different features of the app.</string>
+    <string name="tut_add_med_title">1. Adding Medicines</string>
+    <string name="tut_add_med_desc">Easily add your medicines by scanning the barcode or entering details manually.</string>
+    <string name="tut_ai_title">2. AI Assistant</string>
+    <string name="tut_ai_desc">Use voice or text search to ask questions about your medicines and get guidance from the Local LLM.</string>
+    <string name="tut_track_title">3. Track Expiry</string>
+    <string name="tut_track_desc">Get early notifications and alerts before your medicines expire.</string>
+    <string name="tut_export_title">4. Export &amp; Print</string>
+    <string name="tut_export_desc">Export your medicine list as a PDF or CSV file to share with your doctor or print.</string>
+    <string name="got_it">Got it!</string>
+</resources>

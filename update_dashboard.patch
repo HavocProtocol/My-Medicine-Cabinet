@@ -1,0 +1,80 @@
+--- app/src/main/java/com/example/ui/screens/DashboardScreen.kt
++++ app/src/main/java/com/example/ui/screens/DashboardScreen.kt
+@@ -17,6 +17,8 @@
+ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.graphics.vector.ImageVector
+ import androidx.compose.ui.res.painterResource
++import androidx.compose.ui.res.stringResource
++import com.example.R
+ import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.ui.unit.dp
+ import androidx.lifecycle.viewmodel.compose.viewModel
+@@ -52,14 +54,14 @@
+             TopAppBar(
+                 title = {
+                     Row(verticalAlignment = Alignment.CenterVertically) {
+-                        Text("صندوق أدويتى", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
++                        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
+                     }
+                 },
+                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+             )
+         },
+         floatingActionButton = {
+-            FloatingActionButton(onClick = onAddMedicine, containerColor = MaterialTheme.colorScheme.primary) {
++            FloatingActionButton(onClick = onAddMedicine, containerColor = MaterialTheme.colorScheme.primary, contentDescription = stringResource(R.string.add_medicine)) {
+                 Icon(Icons.Default.Add, contentDescription = "Add Medicine")
+             }
+         }
+@@ -75,7 +77,7 @@
+             OutlinedTextField(
+                 value = searchQuery,
+                 onValueChange = { searchQuery = it },
+-                placeholder = { Text("بحث بالاسم التجاري أو المادة الفعالة") },
++                placeholder = { Text(stringResource(R.string.search_placeholder)) },
+                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                 modifier = Modifier.fillMaxWidth(),
+                 shape = RoundedCornerShape(12.dp)
+@@ -84,18 +86,18 @@
+             Spacer(modifier = Modifier.height(16.dp))
+             
+             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+-                StatCard(title = "إجمالي الأدوية", value = allMedicines.size, icon = Icons.Default.MedicalServices, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+-                StatCard(title = "أدوية منتهية", value = expiredMedicines.size, icon = Icons.Default.Warning, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
++                StatCard(title = stringResource(R.string.total_medicines), value = allMedicines.size, icon = Icons.Default.MedicalServices, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
++                StatCard(title = stringResource(R.string.expired_medicines), value = expiredMedicines.size, icon = Icons.Default.Warning, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
+             }
+             
+             Spacer(modifier = Modifier.height(24.dp))
+             
+-            Text("اختصارات", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
++            Text(stringResource(R.string.shortcuts), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+             Spacer(modifier = Modifier.height(10.dp))
+             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+-                ShortcutButton(label = "إضافة دواء", icon = Icons.Outlined.Add, onClick = onAddMedicine, modifier = Modifier.weight(1f))
+-                ShortcutButton(label = "مسح الباركود", icon = Icons.Outlined.QrCodeScanner, onClick = onScan, modifier = Modifier.weight(1f))
+-                ShortcutButton(label = "التصنيفات", icon = Icons.Outlined.Category, onClick = onCategories, modifier = Modifier.weight(1f))
++                ShortcutButton(label = stringResource(R.string.add_medicine), icon = Icons.Outlined.Add, onClick = onAddMedicine, modifier = Modifier.weight(1f))
++                ShortcutButton(label = stringResource(R.string.scan_barcode), icon = Icons.Outlined.QrCodeScanner, onClick = onScan, modifier = Modifier.weight(1f))
++                ShortcutButton(label = stringResource(R.string.categories), icon = Icons.Outlined.Category, onClick = onCategories, modifier = Modifier.weight(1f))
+             }
+             Spacer(modifier = Modifier.height(10.dp))
+             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+-                ShortcutButton(label = "بحث الذكاء الاصطناعي", icon = Icons.Outlined.Search, onClick = onAISearch, modifier = Modifier.weight(1f))
+-                ShortcutButton(label = "محادثة صوتية (Live)", icon = Icons.Outlined.Mic, onClick = onVoice, modifier = Modifier.weight(1f))
++                ShortcutButton(label = stringResource(R.string.ai_search), icon = Icons.Outlined.Search, onClick = onAISearch, modifier = Modifier.weight(1f))
++                ShortcutButton(label = stringResource(R.string.voice_chat), icon = Icons.Outlined.Mic, onClick = onVoice, modifier = Modifier.weight(1f))
+             }
+             Spacer(modifier = Modifier.height(10.dp))
+             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+-                ShortcutButton(label = "المزامنة والإعدادات", icon = Icons.Outlined.Settings, onClick = onSettings, modifier = Modifier.weight(1f))
+-                ShortcutButton(label = "طباعة القائمة", icon = Icons.Outlined.Print, onClick = onPrint, modifier = Modifier.weight(1f))
++                ShortcutButton(label = stringResource(R.string.settings), icon = Icons.Outlined.Settings, onClick = onSettings, modifier = Modifier.weight(1f))
++                ShortcutButton(label = stringResource(R.string.export_print), icon = Icons.Outlined.Print, onClick = onPrint, modifier = Modifier.weight(1f))
+             }
+             
+             Spacer(modifier = Modifier.height(24.dp))
+             
+-            Text("قائمة الأدوية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
++            Text(stringResource(R.string.medicine_list), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+             Spacer(modifier = Modifier.height(10.dp))

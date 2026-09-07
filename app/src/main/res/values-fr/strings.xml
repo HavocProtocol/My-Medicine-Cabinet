@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Mon Armoire à Pharmacie</string>
+    
+    <!-- Dashboard -->
+    <string name="search_placeholder">Rechercher par nom commercial ou principe actif</string>
+    <string name="overview">Aperçu</string>
+    <string name="total_medicines">Total des médicaments</string>
+    <string name="expiring_soon">Expire bientôt</string>
+    <string name="expired_medicines">Expiré</string>
+    <string name="quick_actions">Actions rapides</string>
+    <string name="add_medicine">Ajouter un médicament</string>
+    <string name="scan_barcode">Scanner le code-barres</string>
+    <string name="categories">Catégories</string>
+    <string name="ai_voice_search">Recherche Vocale IA</string>
+    <string name="export_print">Exporter et Imprimer</string>
+    <string name="ai_search">Recherche IA</string>
+    <string name="medicine_list">Liste des médicaments</string>
+    <string name="no_medicines_yet">Aucun médicament enregistré</string>
+    <string name="notifications">Notifications</string>
+
+    <!-- General Navigation -->
+    <string name="back">Retour</string>
+    <string name="save">Enregistrer</string>
+    <string name="cancel">Annuler</string>
+    <string name="delete">Supprimer</string>
+    <string name="edit">Modifier</string>
+    <string name="add">Ajouter</string>
+    <string name="next">Suivant</string>
+    <string name="start">Commencer</string>
+    <string name="finish_setup">Terminer</string>
+    <string name="share">Partager</string>
+
+    <!-- Add Medicine -->
+    <string name="add_medicine_title">Ajouter un nouveau médicament</string>
+    <string name="trade_name">Nom commercial *</string>
+    <string name="scientific_name">Nom scientifique / Principe actif</string>
+    <string name="strength">Dosage et concentration</string>
+    <string name="dosage_form">Forme pharmaceutique</string>
+    <string name="remaining_quantity">Quantité restante</string>
+    <string name="manufacturer">Fabricant</string>
+    <string name="storage_location">Lieu de stockage</string>
+    <string name="needs_refrigeration">Nécessite une réfrigération ?</string>
+    <string name="save_medicine_button">Enregistrer le médicament</string>
+    <string name="form_tablets">Comprimés</string>
+    <string name="form_capsules">Gélules</string>
+    <string name="form_syrup">Sirop</string>
+    <string name="form_cream">Crème / Pommade</string>
+    <string name="form_spray">Spray</string>
+    <string name="form_drops">Gouttes</string>
+    <string name="form_injections">Injections</string>
+    <string name="form_other">Autre</string>
+
+    <!-- Categories Screen -->
+    <string name="categories_title">Catégories</string>
+    <string name="no_categories">Aucune catégorie disponible</string>
+    <string name="add_new_category">Ajouter une nouvelle catégorie</string>
+    <string name="category_name">Nom de la catégorie</string>
+
+    <!-- Med Info & Detail -->
+    <string name="med_info_title">Informations sur le médicament</string>
+    <string name="medicine_detail_title">Détails du médicament</string>
+    <string name="medicine_not_found">Médicament introuvable</string>
+    <string name="medical_disclaimer_banner">Ces informations sont fournies à titre indicatif. Consultez toujours un médecin ou un pharmacien.</string>
+    <string name="expired_warning">Ne pas utiliser de médicaments périmés. Consultez votre pharmacien.</string>
+    <string name="ask_med_placeholder">Posez une question sur ce médicament (posologie, indications...)</string>
+    <string name="send_question">Envoyer</string>
+    <string name="emergency_alert">Alerte d\'urgence</string>
+    <string name="source_label">Source : </string>
+    <string name="last_updated">Dernière mise à jour : </string>
+    <string name="expiry_date">Date d\'expiration</string>
+    <string name="log_used_quantity">Enregistrer la dose utilisée</string>
+    <string name="add_new_pack">Ajouter une nouvelle boîte</string>
+    <string name="share_or_print">Partager ou Imprimer</string>
+    <string name="indications">Indications</string>
+    <string name="warnings">Mises en garde</string>
+    <string name="yes">Oui</string>
+    <string name="no">Non</string>
+
+    <!-- Notifications Screen -->
+    <string name="notifications_title">Notifications et alertes</string>
+    <string name="no_notifications">Aucune nouvelle notification</string>
+    <string name="mark_all_read">Tout marquer comme lu</string>
+    <string name="expired_alert_title">Médicament expiré</string>
+    <string name="expiring_soon_alert_title">Expiration imminente</string>
+    <string name="medicine_label">Médicament : </string>
+    <string name="date_label">Date : </string>
+
+    <!-- Settings Screen -->
+    <string name="settings">Paramètres et Synchronisation</string>
+    <string name="language">Langue</string>
+    <string name="change_language">Changer la langue</string>
+    <string name="theme_mode">Thème de l\'application</string>
+    <string name="theme_system">Système par défaut</string>
+    <string name="theme_light">Mode Clair</string>
+    <string name="theme_dark">Mode Sombre</string>
+    <string name="local_llm_settings">Configuration LLM Local (PC)</string>
+    <string name="local_llm_desc">Connectez-vous à un modèle d\'IA local hébergé sur votre PC (ex. Ollama ou LM Studio).</string>
+    <string name="local_llm_host">URL de l\'hôte</string>
+    <string name="local_llm_model">Nom du modèle</string>
+    <string name="test_connection">Tester la connexion</string>
+    <string name="connection_success">Connexion réussie au LLM local !</string>
+    <string name="connection_failed">Échec de la connexion : Vérifiez qu\'Ollama ou LM Studio est lancé sur votre PC.</string>
+    <string name="offline_mode_active">Mode hors ligne actif</string>
+    <string name="offline_mode_desc">Toutes les données sont stockées localement et sécurisées sans internet.</string>
+    <string name="cloud_sync">Synchronisation Cloud</string>
+    <string name="cloud_sync_desc">Sauvegardez vos données dans le cloud.</string>
+    <string name="sync_status">État de la synchronisation : </string>
+    <string name="sync_now">Synchroniser maintenant</string>
+
+    <!-- AI Voice & Search -->
+    <string name="voice_chat_title">Recherche Vocale IA</string>
+    <string name="mic_permission_needed">Veuillez autoriser l\'accès au microphone pour la recherche vocale.</string>
+    <string name="grant_permission">Accorder l\'autorisation</string>
+    <string name="tap_to_speak">Appuyez pour parler avec le LLM local</string>
+    <string name="listening">Écoute en cours...</string>
+    <string name="processing">Traitement par le LLM local...</string>
+    <string name="speaking">Lecture vocale de la réponse...</string>
+    <string name="connected_to_local_llm">Connecté au LLM local</string>
+    <string name="not_connected_local_llm">Non connecté au LLM local</string>
+    <string name="type_message_placeholder">Ou écrivez votre question ici...</string>
+    <string name="ai_search_title">Recherche IA</string>
+    <string name="ai_search_subtitle">Recherchez des conseils et informations médicales :</string>
+    <string name="search_button">Rechercher</string>
+    <string name="use_local_llm">Utiliser le LLM Local (PC)</string>
+    <string name="use_cloud_ai">Utiliser Gemini Cloud</string>
+    <string name="sources">Sources :</string>
+
+    <!-- Print & Export -->
+    <string name="export_print_title">Exporter et Imprimer</string>
+    <string name="export_csv_desc">Exportez vos médicaments au format Excel (CSV) pour analyse.</string>
+    <string name="export_csv_btn">Exporter en Excel (CSV)</string>
+    <string name="export_pdf_desc">Exportez vos médicaments au format PDF pour impression.</string>
+    <string name="export_pdf_btn">Exporter en PDF</string>
+    <string name="export_success">Fichier exporté avec succès</string>
+    <string name="export_error">Une erreur est survenue lors de l\'exportation</string>
+
+    <!-- Scan Barcode -->
+    <string name="scan_title">Scanner le code-barres</string>
+    <string name="camera_permission_needed">L\'accès à la caméra est requis pour scanner les codes-barres.</string>
+    <string name="checking_sfda">Recherche dans la base de données...</string>
+    <string name="scanned_successfully">Scanné avec succès :</string>
+    <string name="scan_another">Scanner un autre code-barres</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title">Mon Armoire à Pharmacie</string>
+    <string name="onboarding_desc">Votre armoire à pharmacie numérique : inventaire des médicaments, suivi des dates de péremption, alertes et export.</string>
+    <string name="choose_country">Choisissez votre pays</string>
+    <string name="country_desc">Les noms des produits varient selon les pays.</string>
+    <string name="privacy_medical_title">Confidentialité et Avertissement Médical</string>
+    <string name="medical_alert_notice">Avertissement : Cette application ne remplace pas un professionnel de santé. Consultez toujours un médecin ou un pharmacien.</string>
+    <string name="agree_privacy">J\'accepte la politique de confidentialité (données locales et chiffrées).</string>
+    <string name="understand_medical">Je comprends que cette application ne remplace pas un médecin.</string>
+
+    <!-- Tutorial -->
+    <string name="tutorial_title">Tutoriel de l\'application</string>
+    <string name="tutorial_desc">Apprenez à utiliser les différentes fonctionnalités de l\'application.</string>
+    <string name="tut_add_med_title">1. Ajouter des médicaments</string>
+    <string name="tut_add_med_desc">Ajoutez facilement vos médicaments en scannant le code-barres ou manuellement.</string>
+    <string name="tut_ai_title">2. Assistant IA</string>
+    <string name="tut_ai_desc">Utilisez la recherche vocale ou textuelle pour poser des questions sur vos médicaments via le LLM local.</string>
+    <string name="tut_track_title">3. Suivi de péremption</string>
+    <string name="tut_track_desc">Recevez des notifications avant que vos médicaments n\'expirent.</string>
+    <string name="tut_export_title">4. Exporter et imprimer</string>
+    <string name="tut_export_desc">Exportez votre liste de médicaments en PDF ou CSV pour la partager ou l\'imprimer.</string>
+    <string name="got_it">J\'ai compris !</string>
+</resources>

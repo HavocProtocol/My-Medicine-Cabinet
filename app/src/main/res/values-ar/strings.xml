@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">صندوق أدويتى</string>
+    
+    <!-- Dashboard -->
+    <string name="search_placeholder">بحث بالاسم التجاري أو المادة الفعالة</string>
+    <string name="overview">نظرة عامة</string>
+    <string name="total_medicines">إجمالي الأدوية</string>
+    <string name="expiring_soon">تنتهي خلال 30 يومًا</string>
+    <string name="expired_medicines">أدوية منتهية</string>
+    <string name="quick_actions">إجراءات سريعة</string>
+    <string name="add_medicine">إضافة دواء</string>
+    <string name="scan_barcode">مسح الباركود</string>
+    <string name="categories">التصنيفات</string>
+    <string name="ai_voice_search">محادثة صوتية ذكية</string>
+    <string name="export_print">تصدير وطباعة</string>
+    <string name="ai_search">بحث الذكاء الاصطناعي</string>
+    <string name="medicine_list">قائمة الأدوية</string>
+    <string name="no_medicines_yet">لا توجد أدوية مسجلة بعد</string>
+    <string name="notifications">الإشعارات</string>
+
+    <!-- General Navigation -->
+    <string name="back">رجوع</string>
+    <string name="save">حفظ</string>
+    <string name="cancel">إلغاء</string>
+    <string name="delete">حذف</string>
+    <string name="edit">تعديل</string>
+    <string name="add">إضافة</string>
+    <string name="next">التالي</string>
+    <string name="start">ابدأ</string>
+    <string name="finish_setup">إنهاء الإعداد</string>
+    <string name="share">مشاركة</string>
+
+    <!-- Add Medicine -->
+    <string name="add_medicine_title">إضافة دواء جديد</string>
+    <string name="trade_name">الاسم التجاري *</string>
+    <string name="scientific_name">الاسم العلمي / المادة الفعالة</string>
+    <string name="strength">التركيز والعيار</string>
+    <string name="dosage_form">شكل الدواء</string>
+    <string name="remaining_quantity">الكمية المتبقية</string>
+    <string name="manufacturer">الشركة المصنعة</string>
+    <string name="storage_location">مكان التخزين</string>
+    <string name="needs_refrigeration">يحتاج إلى تبريد في الثلاجة؟</string>
+    <string name="save_medicine_button">حفظ الدواء</string>
+    <string name="form_tablets">أقراص</string>
+    <string name="form_capsules">كبسولات</string>
+    <string name="form_syrup">شراب</string>
+    <string name="form_cream">مرهم / كريم</string>
+    <string name="form_spray">بخاخ</string>
+    <string name="form_drops">قطرات</string>
+    <string name="form_injections">حقن</string>
+    <string name="form_other">غير ذلك</string>
+
+    <!-- Categories Screen -->
+    <string name="categories_title">التصنيفات</string>
+    <string name="no_categories">لا توجد تصنيفات حالياً</string>
+    <string name="add_new_category">إضافة تصنيف جديد</string>
+    <string name="category_name">اسم التصنيف</string>
+
+    <!-- Med Info & Detail -->
+    <string name="med_info_title">معلومات الدواء</string>
+    <string name="medicine_detail_title">تفاصيل الدواء</string>
+    <string name="medicine_not_found">الدواء غير موجود</string>
+    <string name="medical_disclaimer_banner">هذه المعلومات إرشادية فقط وليست وصفة طبية. التطبيق لا يحل محل استشارة الطبيب أو الصيدلي.</string>
+    <string name="expired_warning">لا تستخدم دواءً منتهي الصلاحية، واستشر الصيدلي لمعرفة طريقة التخلص الآمن منه.</string>
+    <string name="ask_med_placeholder">اسأل عن الدواء (الجرعة، الاستخدامات، الآثار الجانبية...)</string>
+    <string name="send_question">إرسال السؤال</string>
+    <string name="emergency_alert">حالة طارئة</string>
+    <string name="source_label">المصدر: </string>
+    <string name="last_updated">آخر تحديث: </string>
+    <string name="expiry_date">تاريخ الانتهاء</string>
+    <string name="log_used_quantity">تسجيل كمية مستخدمة</string>
+    <string name="add_new_pack">إضافة عبوة جديدة</string>
+    <string name="share_or_print">مشاركة أو طباعة</string>
+    <string name="indications">الاستخدامات</string>
+    <string name="warnings">التحذيرات</string>
+    <string name="yes">نعم</string>
+    <string name="no">لا</string>
+
+    <!-- Notifications Screen -->
+    <string name="notifications_title">الإشعارات والتنبيهات</string>
+    <string name="no_notifications">لا توجد إشعارات جديدة</string>
+    <string name="mark_all_read">تحديد الكل كمقروء</string>
+    <string name="expired_alert_title">دواء منتهي الصلاحية</string>
+    <string name="expiring_soon_alert_title">دواء قارب على الانتهاء</string>
+    <string name="medicine_label">الدواء: </string>
+    <string name="date_label">التاريخ: </string>
+
+    <!-- Settings Screen -->
+    <string name="settings">الإعدادات والمزامنة</string>
+    <string name="language">اللغة</string>
+    <string name="change_language">تغيير لغة التطبيق</string>
+    <string name="theme_mode">مظهر التطبيق</string>
+    <string name="theme_system">تلقائي حسب النظام</string>
+    <string name="theme_light">الوضع الفاتح</string>
+    <string name="theme_dark">الوضع الداكن</string>
+    <string name="local_llm_settings">إعدادات الذكاء الاصطناعي المحلي (Local LLM)</string>
+    <string name="local_llm_desc">اتصل بنموذج ذكاء اصطناعي يعمل محلياً على جهاز الكمبيوتر الخاص بك (مثل Ollama أو LM Studio).</string>
+    <string name="local_llm_host">عنوان الخادم (Host URL)</string>
+    <string name="local_llm_model">اسم النموذج (Model Name)</string>
+    <string name="test_connection">اختبار الاتصال</string>
+    <string name="connection_success">تم الاتصال بنجاح بالخادم المحلي!</string>
+    <string name="connection_failed">فشل الاتصال: تأكد من تشغيل Ollama أو LM Studio على الكمبيوتر.</string>
+    <string name="offline_mode_active">وضع عدم الاتصال نشط</string>
+    <string name="offline_mode_desc">جميع البيانات محفوظة محلياً على جهازك ومتاحة بدون إنترنت.</string>
+    <string name="cloud_sync">مزامنة السحابة</string>
+    <string name="cloud_sync_desc">قم بنسخ بياناتك احتياطياً إلى السحابة.</string>
+    <string name="sync_status">حالة المزامنة: </string>
+    <string name="sync_now">مزامنة الآن</string>
+
+    <!-- AI Voice & Search -->
+    <string name="voice_chat_title">المحادثة الصوتية مع الذكاء الاصطناعي</string>
+    <string name="mic_permission_needed">يرجى منح صلاحية الميكروفون لاستخدام المحادثة الصوتية.</string>
+    <string name="grant_permission">منح الصلاحية</string>
+    <string name="tap_to_speak">اضغط للتحدث مع النموذج المحلي</string>
+    <string name="listening">جارٍ الاستماع...</string>
+    <string name="processing">جارٍ المعالجة عبر النموذج المحلي...</string>
+    <string name="speaking">جارٍ الرد الصوتي...</string>
+    <string name="connected_to_local_llm">متصل بالخادم المحلي</string>
+    <string name="not_connected_local_llm">غير متصل بالخادم المحلي</string>
+    <string name="type_message_placeholder">أو اكتب سؤالك هنا...</string>
+    <string name="ai_search_title">بحث الذكاء الاصطناعي</string>
+    <string name="ai_search_subtitle">ابحث عن تفاصيل الأدوية والارشادات الطبية:</string>
+    <string name="search_button">بحث</string>
+    <string name="use_local_llm">استخدام النموذج المحلي (PC LLM)</string>
+    <string name="use_cloud_ai">استخدام نموذج Gemini السحابي</string>
+    <string name="sources">المصادر:</string>
+
+    <!-- Print & Export -->
+    <string name="export_print_title">تصدير وطباعة</string>
+    <string name="export_csv_desc">تصدير بيانات الأدوية الخاصة بك كملف Excel (CSV) لسهولة العرض والتحليل.</string>
+    <string name="export_csv_btn">تصدير كملف Excel (CSV)</string>
+    <string name="export_pdf_desc">تصدير بيانات الأدوية الخاصة بك كملف PDF للطباعة.</string>
+    <string name="export_pdf_btn">تصدير كملف PDF</string>
+    <string name="export_success">تم تصدير الملف بنجاح</string>
+    <string name="export_error">حدث خطأ أثناء التصدير</string>
+
+    <!-- Scan Barcode -->
+    <string name="scan_title">مسح الباركود</string>
+    <string name="camera_permission_needed">نحتاج إلى صلاحية الكاميرا لمسح الباركود.</string>
+    <string name="checking_sfda">جارٍ التحقق من قاعدة بيانات الأدوية...</string>
+    <string name="scanned_successfully">تم المسح بنجاح:</string>
+    <string name="scan_another">مسح باركود آخر</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title">دوائي المنزلي</string>
+    <string name="onboarding_desc">خزانة أدوية رقمية لإدارة وجرد أدوية المنزل: تسجيل الأدوية، تتبع تواريخ الانتهاء، تنبيهات مبكرة، وطباعة القوائم.</string>
+    <string name="choose_country">اختر بلدك</string>
+    <string name="country_desc">تختلف أسماء المنتجات والمصادر الدوائية حسب البلد.</string>
+    <string name="privacy_medical_title">الخصوصية والتنبيه الطبي</string>
+    <string name="medical_alert_notice">تنبيه طبي: هذا التطبيق ليس بديلاً عن الطبيب أو الصيدلي. لا يشخّص الأمراض ولا يصف الأدوية. أي معلومات عن الجرعات إرشادية فقط ومن مصادر موثوقة. استشر الطبيب أو الصيدلي قبل استخدام أي دواء.</string>
+    <string name="agree_privacy">أوافق على سياسة الخصوصية (تُخزَّن بياناتي محلياً ومشفرة).</string>
+    <string name="understand_medical">أفهم التنبيه الطبي وأن التطبيق ليس بديلاً عن الطبيب أو الصيدلي.</string>
+
+    <!-- Tutorial -->
+    <string name="tutorial_title">دليل الاستخدام</string>
+    <string name="tutorial_desc">تعرف على كيفية استخدام الميزات المختلفة للتطبيق.</string>
+    <string name="tut_add_med_title">١. إضافة الأدوية</string>
+    <string name="tut_add_med_desc">أضف أدويتك بسهولة عن طريق مسح الباركود بالكاميرا أو إدخال التفاصيل يدوياً.</string>
+    <string name="tut_ai_title">٢. المساعد الذكي (AI)</string>
+    <string name="tut_ai_desc">استخدم البحث الصوتي أو النصي لطرح أسئلة حول أدويتك والحصول على إرشادات من النموذج المحلي.</string>
+    <string name="tut_track_title">٣. تتبع الصلاحية</string>
+    <string name="tut_track_desc">احصل على إشعارات وتنبيهات مبكرة قبل انتهاء صلاحية أدويتك بوقت كافٍ.</string>
+    <string name="tut_export_title">٤. تصدير وطباعة</string>
+    <string name="tut_export_desc">قم بتصدير قائمة أدويتك كملف PDF أو CSV لمشاركتها مع طبيبك أو طباعتها.</string>
+    <string name="got_it">حسناً، فهمت</string>
+</resources>

@@ -1,0 +1,99 @@
+--- app/src/main/java/com/example/ui/viewmodels/AppViewModel.kt
++++ app/src/main/java/com/example/ui/viewmodels/AppViewModel.kt
+@@ -2,6 +2,15 @@
+ 
+ import android.app.Application
++import android.app.NotificationChannel
++import android.app.NotificationManager
++import android.content.Context
++import android.os.Build
++import androidx.core.app.NotificationCompat
++import androidx.core.app.NotificationManagerCompat
+ import androidx.lifecycle.AndroidViewModel
+ import androidx.lifecycle.viewModelScope
+ import com.example.data.*
++import com.example.R
+ import kotlinx.coroutines.flow.*
+ import kotlinx.coroutines.launch
+@@ -21,6 +30,12 @@
+     private val _syncState = MutableStateFlow("خامل")
+     val syncState: StateFlow<String> = _syncState.asStateFlow()
+ 
++    val unreadAlerts: StateFlow<List<Alert>> = dao.getUnreadAlerts()
++        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
++
++    init {
++        checkAndGenerateAlerts()
++    }
++
++    private fun checkAndGenerateAlerts() {
++        viewModelScope.launch {
++            val now = System.currentTimeMillis()
++            val thirtyDaysMs = 30L * 24 * 60 * 60 * 1000
++            
++            combine(dao.getAvailableItems(now, null), dao.getExpiredItems(now)) { available, expired ->
++                available to expired
++            }.collect { (available, expired) ->
++                // Handle expired
++                for (item in expired) {
++                    val existing = dao.getAlertByItemAndType(item.id, "EXPIRED")
++                    if (existing == null) {
++                        val alert = Alert(inventoryItemId = item.id, type = "EXPIRED", triggerDate = now, createdAt = now)
++                        dao.insertAlert(alert)
++                        sendPushNotification("دواء منتهي الصلاحية", "يوجد دواء في مخزونك انتهت صلاحيته. يرجى التحقق.")
++                    }
++                }
++                // Handle expiring soon
++                for (item in available) {
++                    if (item.expiryDate - now <= thirtyDaysMs) {
++                        val existing = dao.getAlertByItemAndType(item.id, "EXPIRING_SOON")
++                        if (existing == null) {
++                            val alert = Alert(inventoryItemId = item.id, type = "EXPIRING_SOON", triggerDate = now, createdAt = now)
++                            dao.insertAlert(alert)
++                            sendPushNotification("دواء قارب على الانتهاء", "يوجد دواء في مخزونك ستنتهي صلاحيته خلال 30 يومًا.")
++                        }
++                    }
++                }
++            }
++        }
++    }
++
++    private fun sendPushNotification(title: String, message: String) {
++        val context = getApplication<Application>()
++        val channelId = "medicine_alerts"
++        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
++
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
++            val channel = NotificationChannel(channelId, "Medicine Alerts", NotificationManager.IMPORTANCE_DEFAULT)
++            notificationManager.createNotificationChannel(channel)
++        }
++
++        val notification = NotificationCompat.Builder(context, channelId)
++            .setSmallIcon(android.R.drawable.ic_dialog_alert)
++            .setContentTitle(title)
++            .setContentText(message)
++            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
++            .build()
++
++        // Note: For Android 13+, POST_NOTIFICATIONS permission is required. 
++        // Assuming it's either granted or we suppress the check since it's just an alert trigger.
++        try {
++            notificationManager.notify(System.currentTimeMillis().toInt(), notification)
++        } catch (e: SecurityException) {
++            // Permission not granted
++        }
++    }
++
++    fun markAlertAsRead(id: Int) {
++        viewModelScope.launch {
++            dao.markAlertAsRead(id)
++        }
++    }
++
++    fun markAllAlertsAsRead() {
++        viewModelScope.launch {
++            dao.markAllAlertsAsRead()
++        }
++    }
++
+     fun syncWithCloud() {
