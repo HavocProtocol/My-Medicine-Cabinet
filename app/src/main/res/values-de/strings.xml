@@ -1,8 +1,6 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="app_name">Meine Hausapotheke</string>
-    
-    <!-- Dashboard -->
     <string name="search_placeholder">Nach Handelsnamen oder Wirkstoff suchen</string>
     <string name="overview">Übersicht</string>
     <string name="total_medicines">Medikamente gesamt</string>
@@ -18,8 +16,6 @@
     <string name="medicine_list">Medikamentenliste</string>
     <string name="no_medicines_yet">Noch keine Medikamente erfasst</string>
     <string name="notifications">Benachrichtigungen</string>
-
-    <!-- General Navigation -->
     <string name="back">Zurück</string>
     <string name="save">Speichern</string>
     <string name="cancel">Abbrechen</string>
@@ -30,8 +26,6 @@
     <string name="start">Starten</string>
     <string name="finish_setup">Einrichtung abschließen</string>
     <string name="share">Teilen</string>
-
-    <!-- Add Medicine -->
     <string name="add_medicine_title">Neues Medikament hinzufügen</string>
     <string name="trade_name">Handelsname *</string>
     <string name="scientific_name">Wirkstoff / Wissenschaftlicher Name</string>
@@ -50,14 +44,10 @@
     <string name="form_drops">Tropfen</string>
     <string name="form_injections">Injektionen</string>
     <string name="form_other">Sonstiges</string>
-
-    <!-- Categories Screen -->
     <string name="categories_title">Kategorien</string>
     <string name="no_categories">Derzeit keine Kategorien vorhanden</string>
     <string name="add_new_category">Neue Kategorie hinzufügen</string>
     <string name="category_name">Kategoriename</string>
-
-    <!-- Med Info & Detail -->
     <string name="med_info_title">Medikamenten-Information</string>
     <string name="medicine_detail_title">Medikamentendetails</string>
     <string name="medicine_not_found">Medikament nicht gefunden</string>
@@ -76,8 +66,6 @@
     <string name="warnings">Warnhinweise</string>
     <string name="yes">Ja</string>
     <string name="no">Nein</string>
-
-    <!-- Notifications Screen -->
     <string name="notifications_title">Benachrichtigungen</string>
     <string name="no_notifications">Keine neuen Benachrichtigungen</string>
     <string name="mark_all_read">Alle als gelesen markieren</string>
@@ -85,8 +73,6 @@
     <string name="expiring_soon_alert_title">Läuft bald ab</string>
     <string name="medicine_label">Medikament: </string>
     <string name="date_label">Datum: </string>
-
-    <!-- Settings Screen -->
     <string name="settings">Einstellungen &amp; Sync</string>
     <string name="language">Sprache</string>
     <string name="change_language">App-Sprache ändern</string>
@@ -107,8 +93,6 @@
     <string name="cloud_sync_desc">Sichern Sie Ihre Daten in der Cloud.</string>
     <string name="sync_status">Synchronisierungsstatus: </string>
     <string name="sync_now">Jetzt synchronisieren</string>
-
-    <!-- AI Voice & Search -->
     <string name="voice_chat_title">KI-Sprachsuche</string>
     <string name="mic_permission_needed">Bitte gewähren Sie Mikrofonzugriff für die Sprachsuche.</string>
     <string name="grant_permission">Berechtigung erteilen</string>
@@ -125,8 +109,6 @@
     <string name="use_local_llm">Lokales LLM verwenden (PC)</string>
     <string name="use_cloud_ai">Cloud Gemini KI verwenden</string>
     <string name="sources">Quellen:</string>
-
-    <!-- Print & Export -->
     <string name="export_print_title">Exportieren &amp; Drucken</string>
     <string name="export_csv_desc">Exportieren Sie Ihre Medikamentendaten als Excel-Datei (CSV).</string>
     <string name="export_csv_btn">Als Excel (CSV) exportieren</string>
@@ -134,15 +116,11 @@
     <string name="export_pdf_btn">Als PDF exportieren</string>
     <string name="export_success">Datei erfolgreich exportiert</string>
     <string name="export_error">Fehler beim Exportieren</string>
-
-    <!-- Scan Barcode -->
     <string name="scan_title">Barcode scannen</string>
     <string name="camera_permission_needed">Kamerazugriff wird benötigt, um Barcodes zu scannen.</string>
     <string name="checking_sfda">Medikamentendatenbank wird abgefragt...</string>
     <string name="scanned_successfully">Erfolgreich gescannt:</string>
     <string name="scan_another">Weitere Barcode scannen</string>
-
-    <!-- Onboarding -->
     <string name="onboarding_title">Meine Hausapotheke</string>
     <string name="onboarding_desc">Ihre digitale Hausapotheke: Medikamentenverwaltung, Ablaufdaten im Blick, Benachrichtigungen und Listenexport.</string>
     <string name="choose_country">Wählen Sie Ihr Land</string>
@@ -151,8 +129,6 @@
     <string name="medical_alert_notice">Medizinischer Hinweis: Diese App ersetzt keinen Arzt oder Apotheker. Konsultieren Sie immer medizinisches Fachpersonal.</string>
     <string name="agree_privacy">Ich stimme den Datenschutzbestimmungen zu (lokale und verschlüsselte Speicherung).</string>
     <string name="understand_medical">Ich verstehe den medizinischen Hinweis und dass diese App keinen Arzt ersetzt.</string>
-
-    <!-- Tutorial -->
     <string name="tutorial_title">App-Tutorial</string>
     <string name="tutorial_desc">Erfahren Sie, wie Sie die verschiedenen Funktionen der App nutzen.</string>
     <string name="tut_add_med_title">1. Medikamente hinzufügen</string>
@@ -166,21 +142,56 @@
     <string name="got_it">Alles klar!</string>
     <string name="find_pharmacy">Nächste Apotheke</string>
     <string name="feature_unavailable">Diese Funktion ist nicht verfügbar</string>
-    <string name="nav_home">Home</string>
-    <string name="nav_medicines">Medicines</string>
-    <string name="nav_categories">Categories</string>
-    <string name="nav_settings">Settings</string>
-    <string name="cabinet_status_title">Cabinet Health</string>
-    <string name="cabinet_all_safe">All medications safe and valid</string>
-    <string name="cabinet_need_attention">Attention: Expired or expiring items</string>
-    <string name="recent_cabinet_medicines">Saved Medicines</string>
-    <string name="view_all">View All</string>
-    <string name="app_subtitle">Smart Home Cabinet</string>
-    <string name="add_first_med_prompt">Start by adding medications to your cabinet</string>
-    <string name="days_remaining">%1$d days left</string>
-    <string name="expired_badge">Expired</string>
-    <string name="valid_badge">Valid</string>
+    <string name="nav_home">Startseite</string>
+    <string name="nav_medicines">Medikamente</string>
+    <string name="nav_categories">Kategorien</string>
+    <string name="nav_settings">Einstellungen</string>
+    <string name="cabinet_status_title">Apotheken-Status</string>
+    <string name="cabinet_all_safe">Alle Medikamente sicher und haltbar</string>
+    <string name="cabinet_need_attention">Achtung: Abgelaufene oder bald ablaufende Medikamente</string>
+    <string name="recent_cabinet_medicines">Gespeicherte Medikamente</string>
+    <string name="view_all">Alle anzeigen</string>
+    <string name="app_subtitle">Smarte Hausapotheke</string>
+    <string name="add_first_med_prompt">Fügen Sie zuerst Medikamente zu Ihrer Hausapotheke hinzu</string>
+    <string name="days_remaining">Noch %1$d Tage</string>
+    <string name="expired_badge">Abgelaufen</string>
+    <string name="valid_badge">Gültig</string>
     <string name="menu">Menü</string>
     <string name="unavailable_badge">Nicht verfügbar</string>
     <string name="close">Schließen</string>
+    <string name="cat_respiratory">Atemwege</string>
+    <string name="cat_gastro">Magen-Darm</string>
+    <string name="cat_ent">HNO</string>
+    <string name="cat_painkillers">Schmerzmittel &amp; Fiebersenker</string>
+    <string name="cat_allergy">Allergie</string>
+    <string name="cat_skin">Hautpflege</string>
+    <string name="cat_eye">Augenpflege</string>
+    <string name="cat_vitamins">Vitamine &amp; Nahrungsergänzung</string>
+    <string name="cat_first_aid">Erste Hilfe</string>
+    <string name="cat_chronic">Dauermedikation</string>
+    <string name="cat_custom">Benutzerdefinierte Kategorie</string>
+    <string name="cat_antibiotics">Antibiotika</string>
+    <string name="menu_preferences">Einstellungen</string>
+    <string name="menu_ai_tools">KI &amp; Intelligente Tools</string>
+    <string name="notifications_all_caught_up">Alles auf dem neuesten Stand</string>
+    <string name="notifications_unread">%1$d ungelesen</string>
+    <string name="onboarding_feat_1">Organisieren und verfolgen Sie Ihre Hausapotheke zuverlässig</string>
+    <string name="onboarding_feat_2">Rechtzeitige Benachrichtigungen vor Ablauf der Haltbarkeit</string>
+    <string name="onboarding_feat_3">Volle Privatsphäre durch sichere lokale Speicherung auf Ihrem Gerät</string>
+    <string name="unit_package">Packung</string>
+    <string name="country_saudi">Saudi-Arabien</string>
+    <string name="country_egypt">Ägypten</string>
+    <string name="country_uae">Vereinigte Arabische Emirate</string>
+    <string name="country_kuwait">Kuwait</string>
+    <string name="country_jordan">Jordanien</string>
+    <string name="country_oman">Oman</string>
+    <string name="country_qatar">Katar</string>
+    <string name="country_bahrain">Bahrain</string>
+    <string name="country_other">Andere</string>
+    <string name="voice_welcome_message">Willkommen! Ich bin Ihr intelligenter Hausapotheken-Assistent. Wie kann ich Ihnen heute helfen?</string>
+    <string name="med_info_sample_answer">Gemäß der Packungsbeilage für %1$s (%2$s): Dieses Medikament wird zur Linderung mäßiger Schmerzen und zur Fiebersenkung angewendet. Die übliche Dosis für Erwachsene beträgt bei Bedarf alle 4-6 Stunden 1 bis 2 Tabletten, maximal 8 Tabletten pro Tag. Bitte konsultieren Sie einen Arzt oder Apotheker, wenn die Symptome anhalten.</string>
+    <string name="sync_status_idle">Inaktiv</string>
+    <string name="sync_status_syncing">Synchronisierung...</string>
+    <string name="sync_status_success">Erfolgreich synchronisiert</string>
+    <string name="sync_status_error">Synchronisierungsfehler</string>
 </resources>

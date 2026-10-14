@@ -1,8 +1,6 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="app_name">My Medicine Cabinet</string>
-    
-    <!-- Dashboard -->
     <string name="search_placeholder">Search by trade or active ingredient</string>
     <string name="overview">Overview</string>
     <string name="total_medicines">Total Medicines</string>
@@ -18,8 +16,6 @@
     <string name="medicine_list">Medicine List</string>
     <string name="no_medicines_yet">No medicines recorded yet</string>
     <string name="notifications">Notifications</string>
-
-    <!-- General Navigation -->
     <string name="back">Back</string>
     <string name="save">Save</string>
     <string name="cancel">Cancel</string>
@@ -30,8 +26,6 @@
     <string name="start">Get Started</string>
     <string name="finish_setup">Finish Setup</string>
     <string name="share">Share</string>
-
-    <!-- Add Medicine -->
     <string name="add_medicine_title">Add New Medicine</string>
     <string name="trade_name">Trade Name *</string>
     <string name="scientific_name">Scientific Name / Active Ingredient</string>
@@ -50,14 +44,10 @@
     <string name="form_drops">Drops</string>
     <string name="form_injections">Injections</string>
     <string name="form_other">Other</string>
-
-    <!-- Categories Screen -->
     <string name="categories_title">Categories</string>
     <string name="no_categories">No categories currently available</string>
     <string name="add_new_category">Add New Category</string>
     <string name="category_name">Category Name</string>
-
-    <!-- Med Info & Detail -->
     <string name="med_info_title">Medicine Information</string>
     <string name="medicine_detail_title">Medicine Details</string>
     <string name="medicine_not_found">Medicine not found</string>
@@ -76,8 +66,6 @@
     <string name="warnings">Warnings</string>
     <string name="yes">Yes</string>
     <string name="no">No</string>
-
-    <!-- Notifications Screen -->
     <string name="notifications_title">Notifications &amp; Alerts</string>
     <string name="no_notifications">No new notifications</string>
     <string name="mark_all_read">Mark All as Read</string>
@@ -85,8 +73,6 @@
     <string name="expiring_soon_alert_title">Expiring Soon</string>
     <string name="medicine_label">Medicine: </string>
     <string name="date_label">Date: </string>
-
-    <!-- Settings Screen -->
     <string name="settings">Settings &amp; Sync</string>
     <string name="language">Language</string>
     <string name="change_language">Change App Language</string>
@@ -107,8 +93,6 @@
     <string name="cloud_sync_desc">Backup your data to the cloud.</string>
     <string name="sync_status">Sync Status: </string>
     <string name="sync_now">Sync Now</string>
-
-    <!-- AI Voice & Search -->
     <string name="voice_chat_title">AI Voice Search</string>
     <string name="mic_permission_needed">Please grant microphone permission to use voice search.</string>
     <string name="grant_permission">Grant Permission</string>
@@ -125,8 +109,6 @@
     <string name="use_local_llm">Use Local LLM (PC)</string>
     <string name="use_cloud_ai">Use Cloud Gemini AI</string>
     <string name="sources">Sources:</string>
-
-    <!-- Print & Export -->
     <string name="export_print_title">Export &amp; Print</string>
     <string name="export_csv_desc">Export your medicine data as an Excel (CSV) file for viewing and analysis.</string>
     <string name="export_csv_btn">Export as Excel (CSV)</string>
@@ -134,15 +116,11 @@
     <string name="export_pdf_btn">Export as PDF</string>
     <string name="export_success">File exported successfully</string>
     <string name="export_error">An error occurred during export</string>
-
-    <!-- Scan Barcode -->
     <string name="scan_title">Scan Barcode</string>
     <string name="camera_permission_needed">Camera permission is required to scan barcodes.</string>
     <string name="checking_sfda">Looking up medicine database...</string>
     <string name="scanned_successfully">Scanned successfully:</string>
     <string name="scan_another">Scan Another Barcode</string>
-
-    <!-- Onboarding -->
     <string name="onboarding_title">My Medicine Cabinet</string>
     <string name="onboarding_desc">Digital medicine cabinet for home medication management: record medicines, track expiry dates, receive early alerts, and export lists.</string>
     <string name="choose_country">Choose Your Country</string>
@@ -151,8 +129,6 @@
     <string name="medical_alert_notice">Medical Disclaimer: This app is not a substitute for professional medical advice. It does not diagnose diseases or prescribe medications. Always consult a healthcare professional before taking medications.</string>
     <string name="agree_privacy">I agree to the privacy policy (data is stored locally and encrypted).</string>
     <string name="understand_medical">I understand the medical disclaimer and that this app does not replace a doctor or pharmacist.</string>
-
-    <!-- Tutorial -->
     <string name="tutorial_title">App Tutorial</string>
     <string name="tutorial_desc">Learn how to use the different features of the app.</string>
     <string name="tut_add_med_title">1. Adding Medicines</string>
@@ -183,4 +159,39 @@
     <string name="menu">Menu</string>
     <string name="unavailable_badge">Unavailable</string>
     <string name="close">Close</string>
+    <string name="cat_respiratory">Respiratory</string>
+    <string name="cat_gastro">Gastrointestinal</string>
+    <string name="cat_ent">ENT</string>
+    <string name="cat_painkillers">Painkillers &amp; Antipyretics</string>
+    <string name="cat_allergy">Allergy</string>
+    <string name="cat_skin">Skin Care</string>
+    <string name="cat_eye">Eye Care</string>
+    <string name="cat_vitamins">Vitamins &amp; Supplements</string>
+    <string name="cat_first_aid">First Aid</string>
+    <string name="cat_chronic">Chronic Medications</string>
+    <string name="cat_custom">Custom Category</string>
+    <string name="cat_antibiotics">Antibiotics</string>
+    <string name="menu_preferences">Preferences</string>
+    <string name="menu_ai_tools">AI &amp; Smart Tools</string>
+    <string name="notifications_all_caught_up">All caught up</string>
+    <string name="notifications_unread">%1$d unread</string>
+    <string name="onboarding_feat_1">Organize and track your family\'s medicine inventory accurately</string>
+    <string name="onboarding_feat_2">Early alerts before expiration to avoid medication waste</string>
+    <string name="onboarding_feat_3">Complete privacy with secure local on-device storage</string>
+    <string name="unit_package">Package</string>
+    <string name="country_saudi">Saudi Arabia</string>
+    <string name="country_egypt">Egypt</string>
+    <string name="country_uae">United Arab Emirates</string>
+    <string name="country_kuwait">Kuwait</string>
+    <string name="country_jordan">Jordan</string>
+    <string name="country_oman">Oman</string>
+    <string name="country_qatar">Qatar</string>
+    <string name="country_bahrain">Bahrain</string>
+    <string name="country_other">Other</string>
+    <string name="voice_welcome_message">Welcome! I am your smart medicine cabinet assistant. How can I help you today?</string>
+    <string name="med_info_sample_answer">According to the medical leaflet for %1$s (%2$s): This medicine is used to relieve moderate pain and reduce fever. Usual adult dose is 1-2 tablets every 4-6 hours as needed, not exceeding 8 tablets per day. Please consult a doctor or pharmacist if symptoms persist.</string>
+    <string name="sync_status_idle">Idle</string>
+    <string name="sync_status_syncing">Syncing...</string>
+    <string name="sync_status_success">Synced successfully</string>
+    <string name="sync_status_error">Sync error</string>
 </resources>

@@ -75,7 +75,7 @@ fun VoiceScreen(onBack: () -> Unit) {
             listOf(
                 ChatBubble(
                     isUser = false,
-                    text = "مرحباً بك! أنا مساعد خزانة الأدوية الذكي المتصل بنموذج الذكاء الاصطناعي المحلي على جهازك. كيف يمكنني مساعدتك اليوم؟"
+                    text = context.getString(R.string.voice_welcome_message)
                 )
             )
         )
@@ -135,7 +135,7 @@ fun VoiceScreen(onBack: () -> Unit) {
                 tts?.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "llm_reply")
                 voiceState = VoiceState.IDLE
             }.onFailure { err ->
-                val fallbackMsg = "خطأ في الاتصال بالنموذج المحلي (${err.message ?: "تأكد من تشغيل Ollama أو LM Studio على الكمبيوتر"})."
+                val fallbackMsg = "${context.getString(R.string.connection_failed)} (${err.message ?: ""})"
                 chatMessages = chatMessages + ChatBubble(isUser = false, text = fallbackMsg)
                 voiceState = VoiceState.IDLE
             }

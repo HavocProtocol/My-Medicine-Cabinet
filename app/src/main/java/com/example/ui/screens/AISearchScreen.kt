@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -143,10 +144,10 @@ fun AISearchScreen(onBack: () -> Unit) {
                                     prompt = query
                                 )
                                 responseText = res.getOrElse { err ->
-                                    "خطأ في الاتصال بالنموذج المحلي: ${err.message}"
+                                    "${context.getString(R.string.connection_failed)}: ${err.message}"
                                 }
                             } else {
-                                responseText = performGeminiSearch(query)
+                                responseText = performGeminiSearch(query, context)
                             }
                             isLoading = false
                         }
@@ -193,7 +194,7 @@ private val geminiOkHttpClient = OkHttpClient.Builder()
     .readTimeout(30, TimeUnit.SECONDS)
     .build()
 
-suspend fun performGeminiSearch(query: String): String = withContext(Dispatchers.IO) {
+suspend fun performGeminiSearch(query: String, context: Context): String = withContext(Dispatchers.IO) {
     try {
         val apiKey = BuildConfig.GEMINI_API_KEY
         if (apiKey.isEmpty()) return@withContext "API Key is missing."
@@ -235,7 +236,7 @@ suspend fun performGeminiSearch(query: String): String = withContext(Dispatchers
             val searchChunks = groundingMetadata?.optJSONArray("groundingChunks")
             var sourcesText = ""
             if (searchChunks != null && searchChunks.length() > 0) {
-                sourcesText = "\n\nالمصادر:\n"
+                sourcesText = "\n\n${context.getString(R.string.sources)}\n"
                 for (i in 0 until searchChunks.length()) {
                     val chunk = searchChunks.optJSONObject(i)
                     val web = chunk?.optJSONObject("web")
@@ -250,22 +251,22 @@ suspend fun performGeminiSearch(query: String): String = withContext(Dispatchers
             if (text != null) {
                 text + sourcesText
             } else {
-                "لم يتم العثور على رد."
+                "No response."
             }
         } else {
             if (response.code == 429) {
-                "عذراً، لقد تجاوزت الحد المسموح به لطلبات الذكاء الاصطناعي (Quota Exceeded). يرجى التحقق من مفتاح API أو تحديث خطة الفوترة الخاصة بك."
+                "Quota Exceeded (429). Please verify your API Key or try again later."
             } else {
                 try {
                     val errorJson = JSONObject(responseBody ?: "{}").optJSONObject("error")
-                    val errorMessage = errorJson?.optString("message") ?: "خطأ غير معروف"
-                    "حدث خطأ (${response.code}): $errorMessage"
+                    val errorMessage = errorJson?.optString("message") ?: "Unknown error"
+                    "Error (${response.code}): $errorMessage"
                 } catch (e: Exception) {
-                    "حدث خطأ (${response.code}): $responseBody"
+                    "Error (${response.code}): $responseBody"
                 }
             }
         }
     } catch (e: Exception) {
-        "حدث خطأ في الاتصال: ${e.message}"
+        "${context.getString(R.string.connection_failed)}: ${e.message}"
     }
 }

@@ -44,9 +44,10 @@ fun AddMedicineScreen(
         stringResource(R.string.form_other)
     )
     val defaultForm = forms.firstOrNull() ?: ""
+    val defaultUnit = stringResource(R.string.unit_package)
     var form by remember { mutableStateOf("") }
     LaunchedEffect(defaultForm) {
-        if (form.isEmpty() || form == "أقراص") {
+        if (form.isEmpty()) {
             form = defaultForm
         }
     }
@@ -282,7 +283,7 @@ fun AddMedicineScreen(
                             indications = indications.takeIf { it.isNotBlank() },
                             warnings = null,
                             quantity = quantity.toDoubleOrNull() ?: 1.0,
-                            unit = "عبوة",
+                            unit = defaultUnit,
                             purchaseDate = System.currentTimeMillis(),
                             expiryDate = datePickerState.selectedDateMillis ?: (System.currentTimeMillis() + 365L * 24 * 60 * 60 * 1000),
                             batchNumber = batchNumber.takeIf { it.isNotBlank() },

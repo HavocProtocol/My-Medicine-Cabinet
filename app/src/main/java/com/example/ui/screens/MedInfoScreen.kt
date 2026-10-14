@@ -149,13 +149,14 @@ fun MedInfoScreen(
                         ),
                         maxLines = 3
                     )
+                    val sampleAnswerText = stringResource(R.string.med_info_sample_answer, medicineName, scientificName)
                     Spacer(modifier = Modifier.height(12.dp))
                     Button(
                         shape = RoundedCornerShape(12.dp),
                         onClick = {
                             if (question.isNotBlank()) {
                                 isLoading = true
-                                answer = "وفقاً للنشرة الطبية المعتمدة لـ $medicineName ($scientificName): يُستخدم هذا الدواء لتخفيف الآلام المتوسطة وخفض الحرارة. الجرعة المعتادة للبالغين قرص إلى قرصين كل 4-6 ساعات حسب الحاجة دون تجاوز 8 أقراص يومياً. يرجى مراجعة الطبيب أو الصيدلي في حال استمرار الأعراض."
+                                answer = sampleAnswerText
                                 isLoading = false
                             }
                         },

@@ -12,6 +12,13 @@ import com.example.data.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
+enum class SyncStatus {
+    IDLE,
+    SYNCING,
+    SUCCESS,
+    ERROR
+}
+
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val dao = AppDatabase.getDatabase(application).appDao()
 
@@ -29,7 +36,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val expiredItems: StateFlow<List<InventoryItem>> = dao.getExpiredItems(nowTime)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _syncState = MutableStateFlow("خامل")
+    private val _syncStatus = MutableStateFlow(SyncStatus.IDLE)
+    val syncStatus: StateFlow<SyncStatus> = _syncStatus.asStateFlow()
+
+    private val _syncState = MutableStateFlow("")
     val syncState: StateFlow<String> = _syncState.asStateFlow()
 
     val unreadAlerts: StateFlow<List<AlertWithMedicine>> = dao.getUnreadAlertsWithMedicine()
@@ -40,10 +50,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val cats = dao.getAllCategories().first()
             if (cats.isEmpty()) {
-                dao.insertCategory(Category(name = "مسكنات الألم", description = null, color = null, icon = null))
-                dao.insertCategory(Category(name = "مضادات حيوية", description = null, color = null, icon = null))
-                dao.insertCategory(Category(name = "فيتامينات", description = null, color = null, icon = null))
-                dao.insertCategory(Category(name = "أدوية مزمنة", description = null, color = null, icon = null))
+                dao.insertCategory(Category(name = "Painkillers & Antipyretics", isDefault = true, description = null, color = null, icon = null))
+                dao.insertCategory(Category(name = "Antibiotics", isDefault = true, description = null, color = null, icon = null))
+                dao.insertCategory(Category(name = "Vitamins & Supplements", isDefault = true, description = null, color = null, icon = null))
+                dao.insertCategory(Category(name = "Chronic Medications", isDefault = true, description = null, color = null, icon = null))
             }
         }
     }
@@ -113,7 +123,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun syncWithCloud() {
         viewModelScope.launch {
-            _syncState.value = "جاري المزامنة..."
+            _syncStatus.value = SyncStatus.SYNCING
             try {
                 val unsyncedMeds = dao.getUnsyncedMedicines()
                 val unsyncedItems = dao.getUnsyncedInventoryItems()
@@ -124,9 +134,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (unsyncedItems.isNotEmpty()) {
                     dao.markInventoryItemsAsSynced(unsyncedItems.map { it.id })
                 }
-                _syncState.value = "تمت المزامنة بنجاح: ${unsyncedMeds.size} أدوية و ${unsyncedItems.size} عناصر."
+                _syncStatus.value = SyncStatus.SUCCESS
             } catch (e: Exception) {
-                _syncState.value = "خطأ في المزامنة."
+                _syncStatus.value = SyncStatus.ERROR
             }
         }
     }

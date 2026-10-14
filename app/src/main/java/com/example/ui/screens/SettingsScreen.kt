@@ -43,7 +43,7 @@ fun SettingsScreen(
     viewModel: AppViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val syncState by viewModel.syncState.collectAsState()
+    val syncStatus by viewModel.syncStatus.collectAsState()
     val coroutineScope = rememberCoroutineScope()
 
     var languageExpanded by remember { mutableStateOf(false) }
@@ -485,8 +485,14 @@ fun SettingsScreen(
                         }
                     }
                     Spacer(modifier = Modifier.height(12.dp))
+                    val syncStatusText = when (syncStatus) {
+                        com.example.ui.viewmodels.SyncStatus.IDLE -> stringResource(R.string.sync_status_idle)
+                        com.example.ui.viewmodels.SyncStatus.SYNCING -> stringResource(R.string.sync_status_syncing)
+                        com.example.ui.viewmodels.SyncStatus.SUCCESS -> stringResource(R.string.sync_status_success)
+                        com.example.ui.viewmodels.SyncStatus.ERROR -> stringResource(R.string.sync_status_error)
+                    }
                     Text(
-                        text = "${stringResource(R.string.sync_status)} $syncState",
+                        text = "${stringResource(R.string.sync_status)} $syncStatusText",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )

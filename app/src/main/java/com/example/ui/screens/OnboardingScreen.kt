@@ -32,11 +32,21 @@ import com.example.R
 @Composable
 fun OnboardingScreen(onFinish: () -> Unit) {
     var step by remember { mutableIntStateOf(0) }
-    var selectedCountry by remember { mutableStateOf("السعودية") }
     var agreePrivacy by remember { mutableStateOf(false) }
     var understandDisclaimer by remember { mutableStateOf(false) }
 
-    val countries = listOf("السعودية", "مصر", "الإمارات", "الكويت", "الأردن", "عمان", "قطر", "البحرين", "أخرى")
+    val countries = listOf(
+        "SA" to R.string.country_saudi,
+        "EG" to R.string.country_egypt,
+        "AE" to R.string.country_uae,
+        "KW" to R.string.country_kuwait,
+        "JO" to R.string.country_jordan,
+        "OM" to R.string.country_oman,
+        "QA" to R.string.country_qatar,
+        "BH" to R.string.country_bahrain,
+        "OTHER" to R.string.country_other
+    )
+    var selectedCountryCode by remember { mutableStateOf("SA") }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -173,19 +183,19 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                         ) {
                             OnboardingFeaturePill(
                                 icon = Icons.Outlined.Medication,
-                                text = "تنظيم ومتابعة مخزون أدوية العائلة بدقة",
+                                text = stringResource(R.string.onboarding_feat_1),
                                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                             OnboardingFeaturePill(
                                 icon = Icons.Outlined.NotificationsActive,
-                                text = "تنبيهات مبكرة قبل انتهاء الصلاحية وتجنب الهدر",
+                                text = stringResource(R.string.onboarding_feat_2),
                                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                             )
                             OnboardingFeaturePill(
                                 icon = Icons.Outlined.VerifiedUser,
-                                text = "خصوصية تامة وحفظ آمن للبيانات على هاتفك",
+                                text = stringResource(R.string.onboarding_feat_3),
                                 containerColor = MaterialTheme.colorScheme.surface,
                                 contentColor = MaterialTheme.colorScheme.onSurface
                             )
@@ -238,12 +248,13 @@ fun OnboardingScreen(onFinish: () -> Unit) {
 
                         // Styled Country Selection Cards in Light Blue
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            countries.forEach { country ->
-                                val isSelected = (selectedCountry == country)
+                            countries.forEach { (code, nameRes) ->
+                                val isSelected = (selectedCountryCode == code)
+                                val countryName = stringResource(nameRes)
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clickable { selectedCountry = country },
+                                        .clickable { selectedCountryCode = code },
                                     shape = RoundedCornerShape(14.dp),
                                     colors = CardDefaults.cardColors(
                                         containerColor = if (isSelected)
@@ -265,7 +276,7 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Text(
-                                            text = country,
+                                            text = countryName,
                                             style = MaterialTheme.typography.bodyLarge.copy(
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                                 color = if (isSelected)
@@ -275,7 +286,7 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                                         )
                                         RadioButton(
                                             selected = isSelected,
-                                            onClick = { selectedCountry = country },
+                                            onClick = { selectedCountryCode = code },
                                             colors = RadioButtonDefaults.colors(
                                                 selectedColor = MaterialTheme.colorScheme.primary,
                                                 unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)

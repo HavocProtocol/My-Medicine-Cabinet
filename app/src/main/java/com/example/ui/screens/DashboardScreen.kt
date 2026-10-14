@@ -103,7 +103,6 @@ fun DashboardScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (menuExpanded) Modifier.blur(16.dp) else Modifier)
                 .background(MaterialTheme.colorScheme.background)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 16.dp)
@@ -653,9 +652,9 @@ fun DashboardScreen(
                             )
                             Text(
                                 text = if (unreadAlerts.isNotEmpty())
-                                    "${unreadAlerts.size} unread"
+                                    stringResource(R.string.notifications_unread, unreadAlerts.size)
                                 else
-                                    "All caught up",
+                                    stringResource(R.string.notifications_all_caught_up),
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -701,7 +700,7 @@ fun DashboardScreen(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Preferences",
+                                text = stringResource(R.string.menu_preferences),
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -797,7 +796,7 @@ fun DashboardScreen(
 
                 // 3. AI & SMART FEATURES
                 Text(
-                    text = "AI & Smart Tools",
+                    text = stringResource(R.string.menu_ai_tools),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary,
@@ -811,14 +810,15 @@ fun DashboardScreen(
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
                 ) {
                     Column {
-                        // AI Voice Search
+                        // AI Voice Search (Unavailable)
                         ModernMenuItemRow(
                             icon = Icons.Outlined.Mic,
-                            iconTint = MaterialTheme.colorScheme.primary,
+                            iconTint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
                             title = stringResource(R.string.ai_voice_search),
+                            badgeText = stringResource(R.string.unavailable_badge),
+                            enabled = false,
                             onClick = {
-                                menuExpanded = false
-                                onVoice()
+                                Toast.makeText(context, unavailableMessage, Toast.LENGTH_SHORT).show()
                             }
                         )
                         HorizontalDivider(
@@ -1288,13 +1288,13 @@ fun MedicinePreviewCard(
         else -> Triple(stringResource(R.string.valid_badge), Color(0xFFD1FAE5), Color(0xFF065F46))
     }
 
-    val formIcon = when (medicine.form.lowercase()) {
-        "tablets", "أقراص", "capsules", "كبسولات" -> Icons.Outlined.Medication
-        "syrup", "شراب" -> Icons.Outlined.WaterDrop
-        "cream", "مرهم / كريم" -> Icons.Outlined.Healing
+    val formIcon = when (medicine.form.lowercase().trim()) {
+        "tablets", "أقراص", "capsules", "كبسولات", "comprimés", "gélules", "tabletten", "kapseln" -> Icons.Outlined.Medication
+        "syrup", "شراب", "sirop", "sirup / saft", "sirup", "saft" -> Icons.Outlined.WaterDrop
+        "cream", "مرهم / كريم", "crème / pommade", "crème", "creme / salbe", "creme", "salbe" -> Icons.Outlined.Healing
         "spray", "بخاخ" -> Icons.Outlined.Air
-        "drops", "قطرات" -> Icons.Outlined.Opacity
-        "injections", "حقن" -> Icons.Outlined.Vaccines
+        "drops", "قطرات", "gouttes", "tropfen" -> Icons.Outlined.Opacity
+        "injections", "حقن", "injektionen" -> Icons.Outlined.Vaccines
         else -> Icons.Outlined.MedicalServices
     }
 

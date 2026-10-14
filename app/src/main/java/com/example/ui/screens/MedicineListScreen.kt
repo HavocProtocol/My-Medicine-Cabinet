@@ -129,13 +129,13 @@ fun MedicineListScreen(
                         else -> Triple(stringResource(R.string.valid_badge), Color(0xFFD1FAE5), Color(0xFF065F46))
                     }
 
-                    val formIcon = when (medicine.form.lowercase()) {
-                        "tablets", "أقراص", "capsules", "كبسولات" -> Icons.Outlined.Medication
-                        "syrup", "شراب" -> Icons.Outlined.WaterDrop
-                        "cream", "مرهم / كريم" -> Icons.Outlined.Healing
+                    val formIcon = when (medicine.form.lowercase().trim()) {
+                        "tablets", "أقراص", "capsules", "كبسولات", "comprimés", "gélules", "tabletten", "kapseln" -> Icons.Outlined.Medication
+                        "syrup", "شراب", "sirop", "sirup / saft", "sirup", "saft" -> Icons.Outlined.WaterDrop
+                        "cream", "مرهم / كريم", "crème / pommade", "crème", "creme / salbe", "creme", "salbe" -> Icons.Outlined.Healing
                         "spray", "بخاخ" -> Icons.Outlined.Air
-                        "drops", "قطرات" -> Icons.Outlined.Opacity
-                        "injections", "حقن" -> Icons.Outlined.Vaccines
+                        "drops", "قطرات", "gouttes", "tropfen" -> Icons.Outlined.Opacity
+                        "injections", "حقن", "injektionen" -> Icons.Outlined.Vaccines
                         else -> Icons.Outlined.MedicalServices
                     }
 
