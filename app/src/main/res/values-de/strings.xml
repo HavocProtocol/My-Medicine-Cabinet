@@ -164,4 +164,23 @@
     <string name="tut_export_title">4. Exportieren &amp; Drucken</string>
     <string name="tut_export_desc">Exportieren Sie Ihre Medikamentenliste als PDF oder CSV, um sie zu teilen oder zu drucken.</string>
     <string name="got_it">Alles klar!</string>
+    <string name="find_pharmacy">Nächste Apotheke</string>
+    <string name="feature_unavailable">Diese Funktion ist nicht verfügbar</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_medicines">Medicines</string>
+    <string name="nav_categories">Categories</string>
+    <string name="nav_settings">Settings</string>
+    <string name="cabinet_status_title">Cabinet Health</string>
+    <string name="cabinet_all_safe">All medications safe and valid</string>
+    <string name="cabinet_need_attention">Attention: Expired or expiring items</string>
+    <string name="recent_cabinet_medicines">Saved Medicines</string>
+    <string name="view_all">View All</string>
+    <string name="app_subtitle">Smart Home Cabinet</string>
+    <string name="add_first_med_prompt">Start by adding medications to your cabinet</string>
+    <string name="days_remaining">%1$d days left</string>
+    <string name="expired_badge">Expired</string>
+    <string name="valid_badge">Valid</string>
+    <string name="menu">Menü</string>
+    <string name="unavailable_badge">Nicht verfügbar</string>
+    <string name="close">Schließen</string>
 </resources>

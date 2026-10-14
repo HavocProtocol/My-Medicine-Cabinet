@@ -32,8 +32,8 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "dawaey_database"
                 )
-                .addCallback(DatabaseCallback())
-                .fallbackToDestructiveMigration()
+                .addCallback(DatabaseCallback(context.applicationContext))
+                .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
                 INSTANCE = instance
                 instance
@@ -41,24 +41,24 @@ abstract class AppDatabase : RoomDatabase() {
         }
     }
 
-    private class DatabaseCallback : RoomDatabase.Callback() {
+    private class DatabaseCallback(private val context: Context) : RoomDatabase.Callback() {
         override fun onCreate(db: SupportSQLiteDatabase) {
             super.onCreate(db)
             INSTANCE?.let { database ->
                 CoroutineScope(Dispatchers.IO).launch {
                     val dao = database.appDao()
                     val defaults = listOf(
-                        "صدرية وتنفسية",
-                        "بطنية وهضمية",
-                        "أنف وأذن وحنجرة",
-                        "مسكنات وخافضات حرارة",
-                        "حساسية",
-                        "جلدية",
-                        "عين",
-                        "فيتامينات ومكملات",
-                        "إسعافات أولية",
-                        "أدوية مزمنة",
-                        "تصنيف مخصص"
+                        context.getString(com.example.R.string.cat_respiratory),
+                        context.getString(com.example.R.string.cat_gastro),
+                        context.getString(com.example.R.string.cat_ent),
+                        context.getString(com.example.R.string.cat_painkillers),
+                        context.getString(com.example.R.string.cat_allergy),
+                        context.getString(com.example.R.string.cat_skin),
+                        context.getString(com.example.R.string.cat_eye),
+                        context.getString(com.example.R.string.cat_vitamins),
+                        context.getString(com.example.R.string.cat_first_aid),
+                        context.getString(com.example.R.string.cat_chronic),
+                        context.getString(com.example.R.string.cat_custom)
                     )
                     defaults.forEach { name ->
                         dao.insertCategory(Category(name = name, isDefault = true, description = null, color = null, icon = null))

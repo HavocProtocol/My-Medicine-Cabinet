@@ -12,7 +12,7 @@ plugins {
 
 android {
   namespace = "com.example"
-  compileSdk { version = release(36) { minorApiLevel = 1 } }
+  compileSdk = 36
 
   defaultConfig {
     applicationId = "com.aistudio.dawaey.manzili.dhmvxy"
@@ -57,7 +57,16 @@ android {
     compose = true
     buildConfig = true
   }
-  testOptions { unitTests { isIncludeAndroidResources = true } }
+    testOptions {
+    unitTests {
+      isIncludeAndroidResources = true
+      all {
+        it.testLogging {
+          events("passed", "skipped", "failed", "standardOut", "standardError")
+        }
+      }
+    }
+  }
   dependenciesInfo {
     includeInApk = false
     includeInBundle = true

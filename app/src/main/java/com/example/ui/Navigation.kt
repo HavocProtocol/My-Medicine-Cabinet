@@ -32,6 +32,7 @@ fun AppNavigation() {
         composable("home") {
             DashboardScreen(
                 onAdd = { navController.navigate("add_medicine") },
+                onStatCardClick = { filter -> navController.navigate("medicine_list/$filter") },
                 onScan = { navController.navigate("scan") },
                 onCategories = { navController.navigate("categories") },
                 onPrint = { navController.navigate("print") },
@@ -39,7 +40,8 @@ fun AppNavigation() {
                 onNotifications = { navController.navigate("notifications") },
                 onAISearch = { navController.navigate("aisearch") },
                 onVoice = { navController.navigate("voice") },
-                onTutorial = { navController.navigate("tutorial") }
+                onTutorial = { navController.navigate("tutorial") },
+                onMedicineClick = { id -> navController.navigate("medicine_detail/$id") }
             )
         }
         composable(
@@ -118,6 +120,15 @@ fun AppNavigation() {
                 onBack = { navController.popBackStack() }
             )
         }
+        composable("medicine_list/{filter}") { backStackEntry ->
+            val filter = backStackEntry.arguments?.getString("filter") ?: "total"
+            MedicineListScreen(
+                filter = filter,
+                onBack = { navController.popBackStack() },
+                onMedicineClick = { id -> navController.navigate("medicine_detail/$id") }
+            )
+        }
+        
         composable("notifications") {
             NotificationsScreen(onBack = { navController.popBackStack() })
         }

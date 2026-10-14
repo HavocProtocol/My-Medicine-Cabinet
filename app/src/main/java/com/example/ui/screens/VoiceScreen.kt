@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -361,7 +362,7 @@ fun VoiceScreen(onBack: () -> Unit) {
                         Icon(
                             imageVector = when (voiceState) {
                                 VoiceState.LISTENING -> Icons.Default.MicOff
-                                VoiceState.SPEAKING -> Icons.Default.VolumeUp
+                                VoiceState.SPEAKING -> Icons.AutoMirrored.Filled.VolumeUp
                                 else -> Icons.Default.Mic
                             },
                             contentDescription = stringResource(R.string.tap_to_speak)

@@ -5,6 +5,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.R
 import com.example.ui.viewmodels.AppViewModel
+import com.example.ui.utils.getLocalizedName
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -31,20 +33,6 @@ fun AddMedicineScreen(
     var tradeName by remember { mutableStateOf(initialTradeName ?: "") }
     var scientificName by remember { mutableStateOf("") }
     var strength by remember { mutableStateOf("") }
-    var form by remember { mutableStateOf("أقراص") }
-    var quantity by remember { mutableStateOf("1") }
-    var manufacturer by remember { mutableStateOf(initialManufacturer ?: "") }
-    var barcode by remember { mutableStateOf(initialBarcode ?: "") }
-    var batchNumber by remember { mutableStateOf("") }
-    var storageLocation by remember { mutableStateOf("") }
-    var needsRefrigeration by remember { mutableStateOf(false) }
-    var usageMode by remember { mutableStateOf("عند الحاجة") }
-    var indications by remember { mutableStateOf("") }
-    var userNotes by remember { mutableStateOf("") }
-
-    val allCategories by viewModel.allCategories.collectAsState()
-    var selectedCategories by remember { mutableStateOf(setOf<Int>()) }
-
     val forms = listOf(
         stringResource(R.string.form_tablets),
         stringResource(R.string.form_capsules),
@@ -55,7 +43,30 @@ fun AddMedicineScreen(
         stringResource(R.string.form_injections),
         stringResource(R.string.form_other)
     )
+    val defaultForm = forms.firstOrNull() ?: ""
+    var form by remember { mutableStateOf("") }
+    LaunchedEffect(defaultForm) {
+        if (form.isEmpty() || form == "أقراص") {
+            form = defaultForm
+        }
+    }
+    var quantity by remember { mutableStateOf("1") }
+    var manufacturer by remember { mutableStateOf(initialManufacturer ?: "") }
+    var barcode by remember { mutableStateOf(initialBarcode ?: "") }
+    var batchNumber by remember { mutableStateOf("") }
+    var storageLocation by remember { mutableStateOf("") }
+    var needsRefrigeration by remember { mutableStateOf(false) }
+    var usageMode by remember { mutableStateOf("") }
+    var indications by remember { mutableStateOf("") }
+    var userNotes by remember { mutableStateOf("") }
+    val allCategories by viewModel.allCategories.collectAsState()
+    var selectedCategories by remember { mutableStateOf(setOf<Int>()) }
     var formExpanded by remember { mutableStateOf(false) }
+    
+    var showDatePicker by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = System.currentTimeMillis() + 365L * 24 * 60 * 60 * 1000)
+    val dateFormatter = remember { java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()) }
+    val selectedDateString = datePickerState.selectedDateMillis?.let { dateFormatter.format(java.util.Date(it)) } ?: ""
 
     val textFieldColors = OutlinedTextFieldDefaults.colors(
         focusedTextColor = MaterialTheme.colorScheme.onSurface,
@@ -136,7 +147,7 @@ fun AddMedicineScreen(
                     readOnly = true,
                     label = { Text(stringResource(R.string.dosage_form)) },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = formExpanded) },
-                    modifier = Modifier.menuAnchor().fillMaxWidth()
+                    modifier = Modifier.menuAnchor(androidx.compose.material3.MenuAnchorType.PrimaryNotEditable).fillMaxWidth()
                 )
                 ExposedDropdownMenu(
                     expanded = formExpanded,
@@ -170,6 +181,7 @@ fun AddMedicineScreen(
                 label = { Text(stringResource(R.string.manufacturer)) },
                 modifier = Modifier.fillMaxWidth()
             )
+
             OutlinedTextField(
                 shape = RoundedCornerShape(12.dp),
                 colors = textFieldColors,
@@ -179,6 +191,39 @@ fun AddMedicineScreen(
                 modifier = Modifier.fillMaxWidth()
             )
             
+            OutlinedTextField(
+                shape = RoundedCornerShape(12.dp),
+                colors = textFieldColors,
+                value = selectedDateString,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text(stringResource(R.string.expiry_date)) },
+                trailingIcon = {
+                    IconButton(onClick = { showDatePicker = true }) {
+                        Icon(Icons.Default.DateRange, contentDescription = "Select Date")
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            if (showDatePicker) {
+                DatePickerDialog(
+                    onDismissRequest = { showDatePicker = false },
+                    confirmButton = {
+                        TextButton(onClick = { showDatePicker = false }) {
+                            Text(stringResource(R.string.save))
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDatePicker = false }) {
+                            Text(stringResource(R.string.cancel))
+                        }
+                    }
+                ) {
+                    DatePicker(state = datePickerState)
+                }
+            }
+
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = needsRefrigeration, onCheckedChange = { needsRefrigeration = it })
                 Text(
@@ -210,7 +255,7 @@ fun AddMedicineScreen(
                                     selectedCategories + category.id
                                 }
                             },
-                            label = { Text(category.name) },
+                            label = { Text(category.getLocalizedName()) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primary,
                                 selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
@@ -239,7 +284,7 @@ fun AddMedicineScreen(
                             quantity = quantity.toDoubleOrNull() ?: 1.0,
                             unit = "عبوة",
                             purchaseDate = System.currentTimeMillis(),
-                            expiryDate = System.currentTimeMillis() + 365L * 24 * 60 * 60 * 1000,
+                            expiryDate = datePickerState.selectedDateMillis ?: (System.currentTimeMillis() + 365L * 24 * 60 * 60 * 1000),
                             batchNumber = batchNumber.takeIf { it.isNotBlank() },
                             storageLocation = storageLocation.takeIf { it.isNotBlank() },
                             needsRefrigeration = needsRefrigeration,

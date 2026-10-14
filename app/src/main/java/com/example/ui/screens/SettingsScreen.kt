@@ -1,16 +1,21 @@
 package com.example.ui.screens
 
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.ui.draw.clip
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.R
 import com.example.services.LocalLlmConfig
@@ -242,69 +248,116 @@ fun SettingsScreen(
                 }
             }
 
-            // Local LLM Configuration Card
+            // Local LLM Configuration Card (Greyed out & Unavailable)
+            val unavailableMsg = stringResource(R.string.feature_unavailable)
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        Toast.makeText(context, unavailableMsg, Toast.LENGTH_SHORT).show()
+                    },
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                ),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+                )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Outlined.Dns,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(36.dp)
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column {
-                            Text(
-                                stringResource(R.string.local_llm_settings),
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                Icons.Outlined.Dns,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                modifier = Modifier.size(34.dp)
                             )
-                            Text(
-                                stringResource(R.string.local_llm_desc),
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column {
+                                Text(
+                                    stringResource(R.string.local_llm_settings),
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    )
                                 )
+                                Text(
+                                    stringResource(R.string.local_llm_desc),
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                                    )
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = unavailableMsg,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }
+
                     Spacer(modifier = Modifier.height(16.dp))
 
                     OutlinedTextField(
                         value = hostUrl,
-                        onValueChange = {
-                            hostUrl = it
-                            LocalLlmConfig.setHostUrl(context, it)
-                        },
+                        onValueChange = {},
+                        enabled = false,
+                        readOnly = true,
                         label = { Text(stringResource(R.string.local_llm_host)) },
                         placeholder = { Text("http://10.0.2.2:11434") },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                Toast.makeText(context, unavailableMsg, Toast.LENGTH_SHORT).show()
+                            },
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.surface,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                            disabledTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                            disabledContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                            disabledBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                            disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
                         )
                     )
                     Spacer(modifier = Modifier.height(10.dp))
 
                     OutlinedTextField(
                         value = modelName,
-                        onValueChange = {
-                            modelName = it
-                            LocalLlmConfig.setModelName(context, it)
-                        },
+                        onValueChange = {},
+                        enabled = false,
+                        readOnly = true,
                         label = { Text(stringResource(R.string.local_llm_model)) },
                         placeholder = { Text("llama3") },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                Toast.makeText(context, unavailableMsg, Toast.LENGTH_SHORT).show()
+                            },
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.surface,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                            disabledTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                            disabledContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                            disabledBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                            disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
                         )
                     )
                     Spacer(modifier = Modifier.height(14.dp))
@@ -312,38 +365,15 @@ fun SettingsScreen(
                     Button(
                         shape = RoundedCornerShape(12.dp),
                         onClick = {
-                            isTestingConnection = true
-                            testResult = null
-                            coroutineScope.launch {
-                                val success = llmService.checkConnection(hostUrl)
-                                isTestingConnection = false
-                                testResult = if (success) "SUCCESS" else "FAILED"
-                            }
+                            Toast.makeText(context, unavailableMsg, Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = !isTestingConnection
-                    ) {
-                        if (isTestingConnection) {
-                            CircularProgressIndicator(
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        } else {
-                            Text(stringResource(R.string.test_connection))
-                        }
-                    }
-
-                    testResult?.let { res ->
-                        Spacer(modifier = Modifier.height(10.dp))
-                        val isOk = res == "SUCCESS"
-                        val msg = if (isOk) stringResource(R.string.connection_success) else stringResource(R.string.connection_failed)
-                        val badgeColor = if (isOk) Color(0xFF16A34A) else MaterialTheme.colorScheme.error
-                        Text(
-                            text = msg,
-                            color = badgeColor,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.SemiBold
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f),
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
                         )
+                    ) {
+                        Text(stringResource(R.string.test_connection))
                     }
                 }
             }
@@ -357,7 +387,7 @@ fun SettingsScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            Icons.Default.HelpOutline,
+                            Icons.AutoMirrored.Outlined.HelpOutline,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(36.dp)

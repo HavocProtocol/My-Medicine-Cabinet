@@ -188,6 +188,11 @@ fun AISearchScreen(onBack: () -> Unit) {
     }
 }
 
+private val geminiOkHttpClient = OkHttpClient.Builder()
+    .connectTimeout(30, TimeUnit.SECONDS)
+    .readTimeout(30, TimeUnit.SECONDS)
+    .build()
+
 suspend fun performGeminiSearch(query: String): String = withContext(Dispatchers.IO) {
     try {
         val apiKey = BuildConfig.GEMINI_API_KEY
@@ -212,16 +217,11 @@ suspend fun performGeminiSearch(query: String): String = withContext(Dispatchers
 
         val requestBody = jsonObj.toString().toRequestBody("application/json".toMediaType())
         val request = Request.Builder()
-            .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey")
+            .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=$apiKey")
             .post(requestBody)
             .build()
 
-        val client = OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .build()
-
-        val response = client.newCall(request).execute()
+        val response = geminiOkHttpClient.newCall(request).execute()
         val responseBody = response.body?.string()
 
         if (response.isSuccessful && responseBody != null) {
@@ -253,9 +253,19 @@ suspend fun performGeminiSearch(query: String): String = withContext(Dispatchers
                 "لم يتم العثور على رد."
             }
         } else {
-            "Error: ${response.code} - $responseBody"
+            if (response.code == 429) {
+                "عذراً، لقد تجاوزت الحد المسموح به لطلبات الذكاء الاصطناعي (Quota Exceeded). يرجى التحقق من مفتاح API أو تحديث خطة الفوترة الخاصة بك."
+            } else {
+                try {
+                    val errorJson = JSONObject(responseBody ?: "{}").optJSONObject("error")
+                    val errorMessage = errorJson?.optString("message") ?: "خطأ غير معروف"
+                    "حدث خطأ (${response.code}): $errorMessage"
+                } catch (e: Exception) {
+                    "حدث خطأ (${response.code}): $responseBody"
+                }
+            }
         }
     } catch (e: Exception) {
-        "Error: ${e.message}"
+        "حدث خطأ في الاتصال: ${e.message}"
     }
 }
