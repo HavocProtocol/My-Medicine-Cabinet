@@ -2,10 +2,6 @@
   <img src="public/assets/aistudio/Home_Medicine_Cabinet_App_Banner_ed81bd42.png" alt="Home Medicine Cabinet Banner" width="100%" />
 </p>
 
-<p align="center">
-  <img src="app/src/main/res/drawable/custom_logo.png" alt="Home Medicine Cabinet Logo" width="110" />
-</p>
-
 # 💊 Home Medicine Cabinet
 ### Your household pharmacy, organized. Your medication schedule, simplified.
 
