@@ -102,3 +102,82 @@ data class AlertWithMedicine(
     val tradeName: String,
     val expiryDate: Long
 )
+
+@Entity(
+    tableName = "medication_schedules",
+    indices = [
+        Index(value = ["userId"]),
+        Index(value = ["medicineId"]),
+        Index(value = ["status"])
+    ]
+)
+data class MedicationSchedule(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val userId: String = "default_user",
+    val familyMemberId: Int? = null,
+    val medicineId: Int? = null,
+    val inventoryItemId: Int? = null,
+    val medicineName: String,
+    val strength: String? = null,
+    val formulation: String? = null,
+    val defaultDosage: Double,
+    val dosageUnit: String,
+    val routeOfAdministration: String? = null,
+    val instructions: String? = null,
+    val userNotes: String? = null,
+    val startDateIso: String,
+    val endDateIso: String? = null,
+    val frequencyType: String, // DAILY, SELECTED_DAYS, INTERVAL_DAYS, CUSTOM_REPEAT
+    val selectedDaysMask: String? = null, // e.g., "1,2,3,4,5,6,7" (1=Mon..7=Sun)
+    val intervalDays: Int? = null, // e.g., every N days
+    val doseTimesJson: String, // JSON array of ScheduledTimeSlot
+    val remindersEnabled: Boolean = true,
+    val status: String = "ACTIVE", // ACTIVE, PAUSED, COMPLETED, BLOCKED_EXPIRED, DISCONTINUED
+    val blockedReason: String? = null,
+    val autoDeductInventory: Boolean = true,
+    val lowStockThreshold: Double = 5.0,
+    val snoozeMinutes: Int = 15,
+    val missedDoseThresholdMinutes: Int = 120,
+    val recordedExpiryDateMillis: Long? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "dose_records",
+    indices = [
+        Index(value = ["occurrenceKey"], unique = true),
+        Index(value = ["userId", "scheduledDateIso"]),
+        Index(value = ["scheduleId"]),
+        Index(value = ["medicineId"])
+    ]
+)
+data class DoseRecord(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val occurrenceKey: String, // "${userId}_${scheduleId}_${scheduledDateIso}_${scheduledTimeHm}"
+    val userId: String = "default_user",
+    val scheduleId: Int,
+    val medicineId: Int? = null,
+    val inventoryItemId: Int? = null,
+    val medicineName: String,
+    val strength: String? = null,
+    val formulation: String? = null,
+    val scheduledDateIso: String, // YYYY-MM-DD
+    val scheduledTimeHm: String, // HH:mm
+    val scheduledTimestampMillis: Long,
+    val configuredDosage: Double,
+    val dosageUnit: String,
+    val routeOfAdministration: String? = null,
+    val instructions: String? = null,
+    val status: String = "PENDING", // PENDING, TAKEN, SKIPPED, MISSED, BLOCKED
+    val actualTakenTimestampMillis: Long? = null,
+    val userNotes: String? = null,
+    val inventoryDeducted: Boolean = false,
+    val deductedAmount: Double = 0.0,
+    val notificationId: Int = 0,
+    val notificationDeliveredAt: Long? = null,
+    val snoozedUntilMillis: Long? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)
+

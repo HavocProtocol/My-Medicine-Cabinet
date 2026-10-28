@@ -86,7 +86,8 @@ fun NotificationsScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(alerts) { alertWithMed ->
-                        val isExpired = alertWithMed.alert.type == "EXPIRED"
+                        val isExpired = alertWithMed.alert.type == "EXPIRED" ||
+                            alertWithMed.alert.type == "SCHEDULE_EXPIRED_BLOCKED"
                         val cardBg = if (isExpired) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer
                         val contentColor = if (isExpired) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer
 
@@ -114,7 +115,11 @@ fun NotificationsScreen(
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column {
                                         Text(
-                                            text = if (isExpired) stringResource(R.string.expired_alert_title) else stringResource(R.string.expiring_soon_alert_title),
+                                            text = when (alertWithMed.alert.type) {
+                                                "SCHEDULE_EXPIRED_BLOCKED" -> stringResource(R.string.sched_status_blocked_expired)
+                                                "EXPIRED" -> stringResource(R.string.expired_alert_title)
+                                                else -> stringResource(R.string.expiring_soon_alert_title)
+                                            },
                                             fontWeight = FontWeight.Bold,
                                             color = contentColor
                                         )

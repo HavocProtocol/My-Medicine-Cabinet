@@ -1,0 +1,6 @@
+TESSDATA_LOCAL_CONFIG_V1
+lang=ara
+script=Arabic
+oem=1
+psm=6
+description=Bundled Arabic OCR model profile for offline medication box recognition

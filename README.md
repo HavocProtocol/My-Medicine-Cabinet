@@ -53,6 +53,18 @@ To ensure absolute privacy, the AI assistant in this app connects to a Large Lan
 **My Medicine Cabinet is designed for organizational purposes only.** 
 The data is stored locally on your device. The app and its AI assistant do not provide professional medical advice, diagnosis, or treatment. Always consult with a qualified healthcare provider or pharmacist regarding medical conditions and medication usage.
 
+## Box scan (OCR)
+
+The **Scan medicine box (`مسح علبة الدواء`)** feature provides a guided, multi-side, 100% on-device OCR workflow (`com.example.boxscan`):
+
+- **How it works:** Users can capture 1 to 6 sides of a medication box (`FRONT`, `BACK`, `SIDE_1`, `SIDE_2`, `FLAP`, `UNKNOWN`). Each image is preprocessed locally (`ImagePreprocessor` normalizes EXIF orientation, resizes to `~1600px`, generates standard contrast-enhanced and high-contrast stamp variants, and retries 90°/180°/270° rotations if text is sparse).
+- **Multilingual Extraction & Merging:** `LocalMultilingualOcrEngine` (with bundled offline profiles in `app/src/main/assets/tessdata/ara.traineddata` and `eng.traineddata`), `TextNormalizer`, `DateParser`, `FieldExtractor`, and `MultiSideMerger` extract and merge candidates across sides with confidence scoring (`DRAFT_THRESHOLD = 0.60`, `HIGH_CONFIDENCE_THRESHOLD = 0.85`, `+0.15` multi-side corroboration bonus).
+- **Supported Fields Only:** Trade/brand name, active ingredient (`scientificName`), strength, dosage form (`MedForm`), pack quantity, manufacturer, batch/lot number (`LOT`), manufacturing date (`MFG`), expiry date (`EXP`), and refrigeration suggestion (`2–8°C` / `يحفظ في الثلاجة`).
+- **Safety Boundaries & Limitations:**
+  - **No Barcode Decoding in Box Scan:** Barcode stripes, GTIN/GS1 Application Identifiers, and 12–14 digit barcode strings are ignored (`MedicineDraft.barcode` is always `null`).
+  - **No Medical Advice Extraction:** `indications`, `warnings`, and `usageMode` (dosage instructions) are never populated from OCR.
+  - **Mandatory Human Review:** Extracted values create an in-memory `MedicineDraft` reviewed in `BoxScanReviewScreen` and `AddMedicineScreen`. Expiry dates require explicit user confirmation before saving, and expired packages display `SafetyStrings.EXPIRED_DISPOSAL`.
+
 ## 📜 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

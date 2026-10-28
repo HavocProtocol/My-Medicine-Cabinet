@@ -1,0 +1,321 @@
+
+دوائي المنزلي — Multi-Side Medicine Box Scan
+Implementation prompt for a coding agent (offline OCR only; no barcode/GTIN scanning)
+Use this prompt with the existing Flutter project, especially add_medicine_screen.dart, dosage_gate.dart, expiry_service.dart, the MedicineDraft/MedForm definitions, app navigation, localization files, and the current database/repository layer.
+
+1. Role and objective
+Act as a senior Flutter engineer working inside an existing production-style Flutter app named دوائي المنزلي. Implement a feature called “مسح علبة الدواء” / “Scan medicine box”.
+
+The user takes 1–6 photos of different sides of a medicine package (front, back, side panels, and optional flap). The app recognizes printed text locally on the device, combines evidence from all photos, and presents a review screen. After review, the feature passes a MedicineDraft to the existing AddMedicineScreen(prefill: draft) flow. The user must review the prefilled data in the existing form and explicitly save it there.
+
+This is an implementation task, not a request for a plan or a standalone demo. Inspect the existing app, implement the feature in its conventions, add tests, run the available checks, and report exactly what passed and what remains blocked.
+
+Priority order
+Medical and data safety.
+Compatibility with the existing app and its models.
+Genuine on-device/offline processing and privacy.
+Correct field extraction and conflict handling.
+Usable Arabic RTL and English UI.
+Convenience and performance.
+2. Inspect the existing project before editing
+Before changing files, inspect at least:
+
+MedicineDraft, the medicine model, and the exact MedForm enum values.
+AddMedicineScreen and its existing prefill behavior, validation, dirty/edit states, and save action.
+DosageGate, SourceReference, expiry_service.dart, and SafetyStrings.expiredDisposal.
+The current router (including GoRouter, if used), dashboard shortcuts, and add-medicine entry points.
+app_ar.arb, app_en.arb, the Flutter/Dart SDK constraints, pubspec.yaml, and pubspec.lock.
+Existing image/photo handling, permissions, storage, and temporary-file cleanup conventions.
+Reuse the project's existing interfaces and naming conventions. Do not invent constructor arguments, enum values, routes, methods, or database fields. If the current architecture differs from the names in this prompt, adapt the implementation to the real source rather than creating duplicate abstractions. Do not rewrite unrelated features.
+
+Before selecting or updating a package, verify that its current API and platform requirements are compatible with this project's Flutter/Dart versions and Android/iOS configuration. Make the smallest necessary dependency changes and preserve compatible locked versions where possible.
+
+3. Non-negotiable safety and scope rules
+OCR only — absolutely no barcode processing
+Do not use GTIN, GS1 Application Identifiers, GS1 DataMatrix, barcode decoding, or product-code lookup in this feature.
+Do not call mobile_scanner, BarcodeScanService, or any existing barcode workflow from the box-scan flow.
+Do not add a GS1 parser.
+MedicineDraft.barcode must remain empty/null according to the existing model contract. The separate existing barcode feature remains separate.
+Ignore barcode stripes, DataMatrix squares, registration numbers, phone numbers, and long digit strings. Never interpret an unlabelled number string near a barcode as a batch number or date.
+Only permitted fields
+OCR may propose values only for fields represented by the existing project model that correspond to:
+
+Trade/brand name.
+Active ingredient text.
+Strength (for example, 500 mg, 250 mg/5 mL, or 1%).
+Dosage form, using only valid values from the existing MedForm enum.
+Manufacturer.
+Batch/lot number.
+Expiry date.
+Manufacturing/production date.
+Pack quantity/size.
+A storage-condition hint; if the existing model uses needsRefrigeration, it may propose a value only as described below and it must require explicit user confirmation.
+Never fill dosage, directions, indications, warnings, contraindications, interactions, or any other medical advice field from OCR. Such information must continue to come only from the app's verified SourceReference/DosageGate flow. If MedicineDraft requires these properties, use the existing safe empty/default behavior; do not populate them from package text.
+
+Human review is mandatory
+OCR creates a draft only. It must never save a medicine or write to the database.
+Every proposed field must be shown as machine-extracted and needing review until the user edits or explicitly confirms it. Use the existing form's supported review/dirty state if available; otherwise add a small, explicit confirmation state without breaking manual entry.
+Expiry date always requires a deliberate confirmation tap, even when confidence is high.
+Low-confidence or ambiguous fields remain empty and show candidate alternatives where useful. Never guess to make the form look complete.
+If the parsed expiry date is in the past, show the existing expired warning using SafetyStrings.expiredDisposal in the review flow. Do not bypass or duplicate the app's established expiry-safety logic.
+The user must still be able to edit or remove every proposed value before saving in AddMedicineScreen.
+Offline processing and privacy
+All image processing, OCR, parsing, and merging must run on-device. Do not upload images or extracted text, call cloud OCR/LLM APIs, or add network requests for recognition.
+Verify the chosen engine/model configuration supports the intended offline behavior. If an engine might fetch its model at first run, do not claim the feature is fully offline until its supported bundled/offline configuration has been verified. Prefer a bundled model or a fully local fallback.
+Camera permission must be requested only when the user opens this feature and needs the camera.
+Clean up temporary images after cancellation and after the scan session finishes, except for an image explicitly retained through an existing, supported package-photo feature. Do not invent persistent photo storage if the app has no such feature.
+Do not add analytics, logging, or crash reports containing package images, recognized text, batch numbers, or dates.
+4. Packages and implementation constraints
+Use compatible, maintained packages as appropriate:
+
+Purpose	Preferred option	Requirements
+Camera	camera (or existing project camera/image-picker abstraction)	Capture one side at a time, preview, flash, tap-to-focus where supported, lifecycle handling
+Latin-script OCR	google_mlkit_text_recognition if compatible and offline behavior is verified	Use its documented API; preserve recognized lines/blocks and bounding boxes where available
+Arabic + English OCR	flutter_tesseract_ocr with bundled ara.traineddata and eng.traineddata, or another compatible fully local engine	Bundle models under assets/tessdata/; configure assets correctly; document download/model size and license
+Image processing	image	EXIF orientation, resize, grayscale, contrast, conservative sharpening/thresholding
+Optional document crop	cunning_document_scanner only if compatible and useful	Must not become a required network-dependent step
+Keep OCR engines replaceable behind a small interface so a different local engine can be added later.
+
+Do not assume every OCR plugin exposes the same metadata. Use engine confidence and bounding boxes if the documented API supplies them. If confidence is unavailable, represent it as unknown and use a conservative, documented rule-based estimate; do not fabricate a model confidence score. If bounding boxes are unavailable, preserve that limitation in the UI rather than creating fake coordinates.
+
+Do not blindly move platform-channel plugin calls into a Dart isolate. Run CPU-heavy Dart image preprocessing or parsing off the UI isolate where supported, and invoke native OCR plugins in the threading/isolate arrangement their documentation supports. The UI must remain responsive and show progress.
+
+5. Suggested architecture
+Create lib/features/box_scan/, adapting names to the existing project:
+
+box_scan/
+├── box_scan_screen.dart              # capture flow and captured-side management
+├── box_scan_review_screen.dart       # merged results, confidence and alternatives
+├── ocr/
+│   ├── ocr_engine.dart               # replaceable OCR interface and shared result types
+│   ├── mlkit_latin_engine.dart       # only if supported by the chosen configuration
+│   ├── tesseract_arabic_engine.dart  # Arabic + English local OCR
+│   └── image_preprocessor.dart       # local image cleanup and transforms
+├── parsing/
+│   ├── text_normalizer.dart          # digit/script/whitespace normalization
+│   ├── field_extractor.dart          # keyword- and context-based field extraction
+│   └── date_parser.dart              # supported date formats and validation
+├── merge/
+│   └── multi_side_merger.dart        # candidate comparison and conflict handling
+├── models/
+│   └── box_scan_models.dart          # shared OCR/candidate/result types, if useful
+└── box_scan_service.dart             # preprocess -> OCR -> parse -> merge -> draft
+Keep responsibilities separate:
+
+OCR engines recognize text; they do not decide what a medicine field means.
+Normalization handles script/digit variations without rewriting ordinary words.
+Parsers produce candidates with evidence, not final trusted medicine data.
+The merger compares candidates from all captured sides.
+The UI presents the candidates and obtains user confirmation.
+BoxScanService orchestrates the pipeline and maps only approved fields to the existing MedicineDraft contract.
+Shared data contracts
+Use types that compile in the project and preserve these concepts (adapt the exact declarations as needed):
+
+class FieldCandidate {
+  final String field;             // e.g. 'tradeName', 'expiryDate'
+  final String value;             // raw or normalized display value
+  final double? ocrConfidence;    // null when the engine supplies none
+  final double confidence;        // conservative, documented estimate (0..1)
+  final String source;            // e.g. 'ocr_latin' or 'ocr_arabic'
+  final int sideIndex;            // source photo index
+  final Rect? box;                // bounding box in a documented coordinate space
+  final String? matchedKeyword;   // label/context supporting the extraction
+}
+
+class BoxScanResult {
+  final MedicineDraft draft;
+  final Map<String, FieldCandidate> chosen;
+  final Map<String, List<FieldCandidate>> alternatives;
+  final List<String> rawTextPerSide;
+}
+You may refine these models, but do not drop provenance, candidate alternatives, or the distinction between raw engine confidence and estimated field confidence. Document whether rectangles refer to the original image or preprocessed image, and transform coordinates correctly when opening a source image.
+
+6. Capture-flow UX
+Arabic-first screen title: مسح علبة الدواء; English localization: Scan medicine box.
+Guide the user through front → back → side 1 → side 2 → optional flap. Let them label/relabel a captured image or mark its side type as unknown; do not assume the first photo is always the front.
+Allow 1–6 photos. Show thumbnails and allow retake, delete, and review of each captured side before processing.
+Main action: تم — استخراج البيانات / Done — extract data.
+Show brief guidance: good lighting, hold steady, fill the frame, avoid glare, and capture a close-up of faint batch/expiry stamps.
+Provide flash toggle and tap-to-focus where hardware and package support them.
+Request camera access only on entry. Handle denied, permanently denied, restricted, unavailable-camera, capture-error, and cancellation states with a clear localized message and safe recovery path.
+Correctly dispose of the camera controller and temporary files on navigation away, errors, retakes, deletion, and cancellation.
+Use proper Arabic RTL layout. Latin strengths, batch codes, and dates must display left-to-right within RTL text using Directionality and/or Unicode isolation as appropriate.
+7. OCR pipeline for every photo
+Load safely: verify the image can be decoded; apply EXIF orientation and normalize coordinate tracking.
+Preprocess conservatively: resize the longest edge to roughly 1600 px while preserving legibility; use grayscale, contrast adjustment, and light sharpening. Keep the original available for retries. Do not apply processing that deletes small text.
+Faint stamped text: when needed, create a second adaptive-threshold/stronger-contrast variant for ink-jet or embossed batch/expiry marks. Treat it as an additional candidate source, not automatically as better evidence.
+Rotation retry: if the first pass recognizes little text, retry 90°, 180°, and 270° as useful. Choose by a consistent measure such as valid text/keyword evidence, not only raw character count. Maintain mapping from transformed bounding boxes back to the displayed source image.
+OCR selection: use the Latin engine for Latin text and run Arabic-capable OCR when Arabic characters are present or the Latin result is sparse. For Tesseract, use the bundled ara+eng models. Avoid unnecessary duplicate full-resolution passes.
+Preserve output: keep line/block ordering, boxes, available confidence, engine/source identifier, and the raw recognized text for each side.
+Responsiveness: report progress by side and phase. Do heavy Dart processing off the UI isolate where supported. Target under roughly 3 seconds per side on a mid-range phone as a goal, not a correctness guarantee; slow devices must remain usable and cancellable.
+8. Text normalization
+Implement and test these rules:
+
+Convert Arabic-Indic digits ٠١٢٣٤٥٦٧٨٩ and Persian digits ۰۱۲۳۴۵۶۷۸۹ to Western digits 0123456789 for parsing, while preserving the original recognized text for display.
+Normalize common Unicode dash, slash, dot, degree, micro-unit, and whitespace variants where safe.
+Collapse repeated whitespace and normalize case only for comparison, not for the user-visible original value.
+Apply OCR substitutions such as O → 0, I/l → 1, S → 5, and B → 8 only inside a validated numeric/date context. Never alter ordinary medicine names or ingredient words using these substitutions.
+For batch codes, normalize surrounding spaces and case for comparison, but preserve the original candidate for display. Do not remove meaningful internal characters unless the normalization rule is explicitly tested.
+Do not infer missing characters or silently complete truncated values.
+9. Field extraction rules
+Use multilingual keyword/context matching plus format validation. Keep field-specific rules in one testable layer. A value without sufficient contextual or format evidence should be rejected or left as a low-confidence alternative.
+
+Expiry date
+Keywords include EXP, Exp., Expiry, Exp. Date, Use before, Use by, انتهاء, تاريخ الانتهاء, صالح حتى, and ينتهي.
+
+Support these printed formats when they can be parsed unambiguously:
+
+MM/YYYY, MM-YY, MM.YYYY
+DD/MM/YYYY
+YYYY-MM, YYYY/MM/DD
+MMM YYYY (for example, JAN 2027), MMM-YY
+Recognized Arabic month names (including variants such as يناير and كانون الثاني) when the month/year pairing is clear.
+Rules:
+
+For month-only expiry dates, represent the expiry as the last calendar day of that month.
+Apply a documented two-digit-year rule. Reject implausible/far-future interpretations rather than silently selecting a questionable century.
+Reject invalid calendar dates and expiry dates more than 10 years ahead of the current date. Inject the current date/clock where needed so tests are deterministic.
+Prefer a date on the same line as an expiry keyword, then a nearby line immediately below it. Distance to the keyword is evidence, not proof.
+Do not extract a bare date as expiry with high confidence when no expiry label or convincing context is present.
+If two different expiry candidates have similar confidence, leave the selected expiry field empty and show both candidates. Do not choose one just because it appeared on the front/back first.
+If the selected expiry is already past, use the established SafetyStrings.expiredDisposal warning and require explicit user confirmation regardless of confidence.
+Manufacturing date
+Keywords include MFG, MFD, Mfg. Date, Prod., Manufactured, تاريخ الإنتاج, and تاريخ التصنيع.
+
+Apply the same date-format validation as expiry.
+A manufacturing date should precede the expiry date. If it does not, reduce confidence and present the conflicting candidates instead of silently correcting either date.
+Detect a common stamped block such as LOT: AB123 / MFG: 01/2025 / EXP: 12/2027. Extract the three labeled values from the same block as a related group and give the group a modest evidence bonus. Do not let that bonus override invalid formats or a clear conflict.
+Batch/lot number
+Keywords include LOT, Lot No, Batch, B.No, Batch No, رقم التشغيلة, and التشغيلة.
+
+Candidate token length: 3–20 alphanumeric characters, allowing only separators the existing model can preserve safely.
+Prefer the token immediately after a batch/lot label.
+Do not treat a date, long registration number, barcode-adjacent number, phone number, or price as a batch number.
+If no label or strong context exists, leave the field empty rather than guessing.
+Strength
+Recognize number-plus-unit patterns such as 500 mg, 250mg/5ml, 1%, 100000 IU, and common Arabic unit spellings including ملغ, مجم, مغ, and مل.
+
+Preserve meaningful concentration expressions such as mg/ml, mg/5ml, and mcg/µg. Do not confuse pack volume with dose strength without surrounding context.
+
+Dosage form
+Recognize common labels such as tablets/أقراص, capsules/كبسولات, syrup/شراب, cream/كريم, ointment/مرهم, spray/بخاخ, drops/قطرات, and injection/vial/ampoule/حقن.
+
+Map only to values supported by the existing MedForm model. Do not collapse ointment into cream unless the existing app deliberately models them as the same form. If the model cannot represent an extracted form accurately, leave the typed field unset (or use an existing explicit other value) and retain the OCR candidate for user review. Never invent an enum member.
+
+Pack quantity/size
+Recognize patterns such as 20 tablets, 30 caps, 100 ml, 20 قرص, 30 كبسولة, and عبوة 30. Keep pack quantity/size distinct from strength and from the number of individual doses.
+
+Trade/brand name
+Prefer the prominent text on a photo explicitly labeled as the front of the package.
+Use text-block height/prominence as one signal, not the only signal. Exclude obvious strengths, manufacturer names, generic phrases, and directions such as tablets or for oral use.
+A repeated matching value across different sides increases confidence modestly.
+If Arabic and Latin names are clearly presented as a pair on the same side, keep the pair or select the representation the existing model supports. Do not invent a translation.
+Active ingredient
+Look near Each tablet contains, Each capsule contains, Composition, Active ingredient, يحتوي كل قرص على, المادة الفعالة, and التركيب. The line below the trade name may provide a clue, but position alone is insufficient. Extract only text that is visibly recognized; do not search the internet or infer an ingredient from a brand name.
+
+Manufacturer
+Look near Manufactured by, Mfd. by, Marketed by, Made in, تصنيع, إنتاج, الشركة المصنعة, or a company-like line ending with Co., Ltd, Pharma, Pharmaceuticals, or شركة. Company suffixes alone are not enough to classify a line with high confidence.
+
+Storage conditions
+Recognize text such as Store at 2–8°C, Keep refrigerated, يحفظ في الثلاجة, and يحفظ في درجة حرارة 2–8 as evidence for a refrigeration suggestion, which the user must confirm.
+
+Store below 25°C does not by itself mean the medicine needs refrigeration.
+Do not freeze does not by itself mean refrigeration is required.
+Preserve a storage-condition hint only if the existing app has an appropriate field or review-only display. Do not add unsupported medical/storage fields without checking the existing schema.
+10. Multi-side merging and confidence
+Collect candidates from all sides and OCR passes, preserving provenance.
+Normalize candidates before comparing them, but keep the original text for display.
+When the OCR engine exposes a confidence value, use it as one evidence input. Combine it with the parser's evidence (valid format, matching nearby keyword, correct field context, bounding-box/layout signal, and repeated agreement) using documented constants in one place.
+When engine confidence is unavailable, use a conservative rule-based estimate and label it as an estimated confidence, not a calibrated probability. Do not display a green/high-confidence state from a fabricated OCR score.
+Repeated identical normalized values across independent sides may gain up to +0.15 per additional side, capped at 0.95. Centralize this rule and test it.
+Default threshold for populating the draft: 0.60, configurable in one place. Candidates below threshold stay empty but may be shown in alternatives/raw text.
+If two different values have similar confidence (start with a configurable tie margin such as 0.10), do not select either automatically. Leave the chosen field empty and show both candidates, especially for expiry and manufacturing dates.
+Repeated evidence must never override an invalid date, a missing mandatory label, an unsupported enum value, or a clear safety conflict.
+Do not turn the scores into medical certainty. The review UI must communicate that values are extracted suggestions and can be wrong.
+11. Review screen and transition to the existing form
+Each supported field should show:
+
+The proposed value, or an explicit empty state.
+A confidence indicator: green for >= 0.85, amber for 0.60–0.849, and no confidence dot below 0.60; label the score as estimated where applicable.
+The source side thumbnail and, where accurate coordinates are available, tap-to-open/zoom to the source bounding box.
+Alternative candidates as selectable chips when there are competing readings.
+A way to edit, clear, and explicitly confirm a proposed value.
+Include:
+
+عرض النص المستخرج / Show recognized text, which displays the raw text for each side for transparency.
+متابعة إلى نموذج الإضافة / Continue to add form, which passes the reviewed MedicineDraft to the existing AddMedicineScreen(prefill: draft) route/constructor.
+An explicit expiry-confirmation action. Do not make the expiry field count as confirmed merely because the user pressed the general continue button.
+The existing expired warning when the chosen expiry is in the past.
+Do not add a second medicine-save mechanism to the scan flow. The final create/save action remains the existing add-medicine form's responsibility. Ensure a manually entered medicine can still be created without using the scanner.
+
+12. App integration and localization
+Add a dashboard shortcut and an action from the existing Add-Medicine screen labeled مسح علبة الدواء.
+Add /scan-box using the project's existing GoRouter/navigation pattern if GoRouter is in use.
+Add all new user-facing strings to app_ar.arb and app_en.arb, following the existing localization generator and naming conventions. Do not hard-code new UI text in widgets.
+Verify Arabic RTL layout and left-to-right rendering for Latin values, strengths, lot codes, and dates.
+Add only the platform permissions and configuration required by the selected packages. Do not request camera access during app startup.
+Check current plugin requirements before changing Android minSdkVersion, Gradle settings, iOS deployment target, or Info.plist. Do not downgrade or make broad platform changes without necessity.
+Bundle the required Tesseract models under assets/tessdata/ and register them in pubspec.yaml. Document their approximate size, source, and license in the README.
+13. Required automated tests
+Write deterministic unit tests with fixed sample text and no real camera or real medicine package required. Use clearly fake sample data only, such as منتج تجريبي and batch TEST01.
+
+text_normalizer_test.dart
+
+Arabic-Indic and Persian digit conversion.
+Dash/whitespace normalization.
+O → 0 / I → 1 substitutions only in supported numeric/date contexts.
+Ordinary words and medicine names are not rewritten.
+date_parser_test.dart
+
+Every supported date format, Arabic month names, two-digit years, month-only dates mapping to the last day of the month, leap years, invalid dates, and dates over the allowed future limit.
+Ambiguous/unlabeled dates are not promoted to high-confidence expiry values.
+Tests use an injectable/fixed clock rather than depending on the real date.
+field_extractor_test.dart
+
+English-only, Arabic-only, and mixed-language text.
+Labeled LOT/MFG/EXP stamped block.
+Strength, dosage form, pack size, manufacturer, and storage hints.
+Barcode-adjacent numbers and long registration numbers are not extracted as batch/expiry values without correct label/context.
+Unsupported form values do not create invalid MedForm values.
+multi_side_merger_test.dart
+
+Matching values across sides increase confidence within the cap.
+Conflicting expiry dates of similar confidence leave the chosen expiry empty and expose both alternatives.
+Low-confidence candidates remain empty in the draft.
+Invalid dates and unsupported fields cannot be rescued by repetition.
+Safety tests
+
+OCR cannot populate dosage, directions, indications, warnings, contraindications, or other medical-advice fields.
+barcode remains empty/null according to the existing contract.
+Past expiry triggers the existing expired warning path.
+No OCR/save operation writes a medicine record before the user completes the normal add-medicine save flow.
+Add small widget/integration tests for navigation/prefill and expiry confirmation if the current test setup makes them practical. Do not use real patient or medicine data in tests.
+
+14. README and deliverables
+Deliver:
+
+The implemented feature integrated into the existing app, with no placeholder methods or unimplemented TODOs in the new flow.
+All new architecture files and any minimal edits to existing files required for integration.
+The tests above, passing where the environment supports them.
+A README section titled Box scan (OCR) describing:
+Package/setup and bundled model assets.
+The genuinely offline behavior and any verified engine limitations.
+Approximate model asset size and licensing/source notes.
+Limits: faint stamped dates, glossy glare, curved/creased boxes, small print, confusing date formats, and OCR mistakes.
+The requirement that users verify every extracted value and explicitly confirm expiry.
+A concise completion report listing changed files, commands run, exact test/analyzer results, and any remaining platform or offline limitation. Never claim a command passed if it was not run successfully.
+15. Build order — follow this sequence
+Inspect existing code and document the actual integration points.
+Implement text normalization and date parsing, with tests.
+Implement field extraction, with tests.
+Implement multi-side merging/conflict handling, with tests.
+Implement local OCR engines and image preprocessing; verify that the selected model configuration does not require a cloud service or unexpected network access.
+Implement camera capture, permission/lifecycle handling, progress, and temporary-file cleanup.
+Implement review UI, confidence/alternatives/raw text, expiry confirmation, and MedicineDraft prefill integration.
+Add routes, dashboard/Add-Medicine entry points, Arabic/English strings, platform setup, and README documentation.
+Run dart format on changed Dart files, then flutter analyze and flutter test. Fix issues introduced by this feature and rerun the checks.
+At each stage, run the relevant tests before moving forward. If a command fails because of a pre-existing unrelated project error, identify the exact error and distinguish it from failures caused by this implementation.
+
+16. Definition of done
+The feature is complete only when a user can capture at least one and up to six package sides, process them locally, see field-level evidence and conflicts, confirm or correct each proposed value, explicitly confirm expiry, and continue through the existing add-medicine form without any automatic save. All OCR output must remain separate from verified medical guidance, the barcode field must stay empty, and the tests/analyzer results must be reported honestly.
+

@@ -2,12 +2,18 @@ package com.example.ui
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.boxscan.models.MedicineDraft
+import com.example.boxscan.ui.BoxScanScreen
 import com.example.ui.screens.*
 import java.net.URLDecoder
 import java.net.URLEncoder
@@ -20,6 +26,9 @@ fun AppNavigation() {
     val isOnboardingComplete = prefs.getBoolean("onboarding_complete", false)
     val startDest = if (isOnboardingComplete) "home" else "onboarding"
 
+    // Shared in-memory draft passed from BoxScanScreen -> AddMedicineScreen
+    var pendingBoxDraft by remember { mutableStateOf<MedicineDraft?>(null) }
+
     NavHost(navController = navController, startDestination = startDest) {
         composable("onboarding") {
             OnboardingScreen(onFinish = {
@@ -31,7 +40,16 @@ fun AppNavigation() {
         }
         composable("home") {
             DashboardScreen(
-                onAdd = { navController.navigate("add_medicine") },
+                onAdd = {
+                    pendingBoxDraft = null
+                    navController.navigate("add_medicine")
+                },
+                onScanBox = {
+                    navController.navigate("scan_box")
+                },
+                onSchedule = {
+                    navController.navigate("medication_schedule")
+                },
                 onStatCardClick = { filter -> navController.navigate("medicine_list/$filter") },
                 onScan = { navController.navigate("scan") },
                 onCategories = { navController.navigate("categories") },
@@ -42,6 +60,35 @@ fun AppNavigation() {
                 onVoice = { navController.navigate("voice") },
                 onTutorial = { navController.navigate("tutorial") },
                 onMedicineClick = { id -> navController.navigate("medicine_detail/$id") }
+            )
+        }
+        composable(
+            route = "medication_schedule?medicineId={medicineId}",
+            arguments = listOf(
+                navArgument("medicineId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val medId = backStackEntry.arguments?.getString("medicineId")?.toIntOrNull()
+            MedicationScheduleScreen(
+                initialMedicineId = medId,
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable("scan_box") {
+            BoxScanScreen(
+                onDraftConfirmed = { draft ->
+                    pendingBoxDraft = draft
+                    navController.navigate("add_medicine") {
+                        popUpTo("scan_box") { inclusive = true }
+                    }
+                },
+                onCancel = {
+                    navController.popBackStack()
+                }
             )
         }
         composable(
@@ -76,8 +123,15 @@ fun AppNavigation() {
                 initialBarcode = barcode,
                 initialTradeName = name,
                 initialManufacturer = manufacturer,
-                onSave = { navController.navigate("home") { popUpTo("home") { inclusive = true } } },
-                onBack = { navController.popBackStack() }
+                prefillDraft = pendingBoxDraft,
+                onSave = {
+                    pendingBoxDraft = null
+                    navController.navigate("home") { popUpTo("home") { inclusive = true } }
+                },
+                onBack = {
+                    pendingBoxDraft = null
+                    navController.popBackStack()
+                }
             )
         }
         composable("medicine_detail/{id}") { backStackEntry ->
@@ -90,6 +144,9 @@ fun AppNavigation() {
                         val encodedName = URLEncoder.encode(name, "UTF-8")
                         val encodedSci = URLEncoder.encode(sci, "UTF-8")
                         navController.navigate("med_info?name=$encodedName&sci=$encodedSci")
+                    },
+                    onScheduleMedicine = { medId ->
+                        navController.navigate("medication_schedule?medicineId=$medId")
                     }
                 )
             }
@@ -100,17 +157,17 @@ fun AppNavigation() {
                 navArgument("name") {
                     type = NavType.StringType
                     nullable = true
-                    defaultValue = "بنادول إكسترا (Panadol Extra)"
+                    defaultValue = "Panadol"
                 },
                 navArgument("sci") {
                     type = NavType.StringType
                     nullable = true
-                    defaultValue = "Paracetamol 500mg + Caffeine 65mg"
+                    defaultValue = "Paracetamol"
                 }
             )
         ) { backStackEntry ->
-            val rawName = backStackEntry.arguments?.getString("name") ?: "بنادول إكسترا (Panadol Extra)"
-            val rawSci = backStackEntry.arguments?.getString("sci") ?: "Paracetamol 500mg + Caffeine 65mg"
+            val rawName = backStackEntry.arguments?.getString("name") ?: "Panadol"
+            val rawSci = backStackEntry.arguments?.getString("sci") ?: "Paracetamol"
             val name = try { URLDecoder.decode(rawName, "UTF-8") } catch (_: Exception) { rawName }
             val sci = try { URLDecoder.decode(rawSci, "UTF-8") } catch (_: Exception) { rawSci }
 
@@ -128,7 +185,7 @@ fun AppNavigation() {
                 onMedicineClick = { id -> navController.navigate("medicine_detail/$id") }
             )
         }
-        
+
         composable("notifications") {
             NotificationsScreen(onBack = { navController.popBackStack() })
         }

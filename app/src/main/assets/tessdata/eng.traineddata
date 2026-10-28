@@ -1,0 +1,6 @@
+TESSDATA_LOCAL_CONFIG_V1
+lang=eng
+script=Latin
+oem=1
+psm=6
+description=Bundled English OCR model profile for offline medication box recognition

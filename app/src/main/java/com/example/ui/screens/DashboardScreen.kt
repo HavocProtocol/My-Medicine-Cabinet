@@ -54,6 +54,8 @@ import java.util.*
 @Composable
 fun DashboardScreen(
     onAdd: () -> Unit,
+    onScanBox: () -> Unit = {},
+    onSchedule: () -> Unit = {},
     onStatCardClick: (String) -> Unit = {},
     onScan: () -> Unit,
     onCategories: () -> Unit,
@@ -333,6 +335,28 @@ fun DashboardScreen(
                         context.startActivity(browserIntent)
                     }
                 },
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Row 2: Scan Medicine Box & Medication Schedule
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            QuickActionButton(
+                label = stringResource(R.string.scan_medicine_box_title),
+                icon = Icons.Default.DocumentScanner,
+                bgColor = MaterialTheme.colorScheme.tertiaryContainer,
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                onClick = onScanBox,
+                modifier = Modifier.weight(1f)
+            )
+            QuickActionButton(
+                label = stringResource(R.string.sched_quick_action),
+                icon = Icons.Default.Alarm,
+                bgColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                onClick = onSchedule,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -764,6 +788,21 @@ fun DashboardScreen(
                             onClick = {
                                 menuExpanded = false
                                 onAdd()
+                            }
+                        )
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+
+                        // Medication Schedule & Reminders
+                        ModernMenuItemRow(
+                            icon = Icons.Default.Alarm,
+                            iconTint = MaterialTheme.colorScheme.primary,
+                            title = stringResource(R.string.sched_title),
+                            onClick = {
+                                menuExpanded = false
+                                onSchedule()
                             }
                         )
                         HorizontalDivider(

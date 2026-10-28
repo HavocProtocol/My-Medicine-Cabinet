@@ -8,6 +8,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.R
 import com.example.data.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -36,6 +37,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val expiredItems: StateFlow<List<InventoryItem>> = dao.getExpiredItems(nowTime)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val allInventoryItems: StateFlow<List<InventoryItem>> = dao.getAllInventoryItems()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     private val _syncStatus = MutableStateFlow(SyncStatus.IDLE)
     val syncStatus: StateFlow<SyncStatus> = _syncStatus.asStateFlow()
 
@@ -60,6 +64,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun checkAndGenerateAlerts() {
         viewModelScope.launch {
+            val app = getApplication<Application>()
             val now = System.currentTimeMillis()
             val thirtyDaysMs = 30L * 24 * 60 * 60 * 1000
             
@@ -71,7 +76,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     if (existing == null) {
                         val alert = Alert(inventoryItemId = item.id, type = "EXPIRED", triggerDate = now, createdAt = now)
                         dao.insertAlert(alert)
-                        sendPushNotification("Expired Medicine", "You have an expired medicine in your inventory.")
+                        sendPushNotification(
+                            app.getString(R.string.expired_alert_title),
+                            app.getString(R.string.expired_warning)
+                        )
                     }
                 }
                 for (item in available) {
@@ -80,7 +88,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         if (existing == null) {
                             val alert = Alert(inventoryItemId = item.id, type = "EXPIRING_SOON", triggerDate = now, createdAt = now)
                             dao.insertAlert(alert)
-                            sendPushNotification("Expiring Soon", "A medicine is expiring within 30 days.")
+                            sendPushNotification(
+                                app.getString(R.string.expiring_soon_alert_title),
+                                app.getString(R.string.expiring_soon)
+                            )
                         }
                     }
                 }
@@ -93,7 +104,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val channelId = "medicine_alerts"
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(channelId, "Medicine Alerts", NotificationManager.IMPORTANCE_DEFAULT)
+            val channel = NotificationChannel(
+                channelId,
+                context.getString(R.string.notifications_title),
+                NotificationManager.IMPORTANCE_DEFAULT
+            )
             notificationManager.createNotificationChannel(channel)
         }
         val notification = NotificationCompat.Builder(context, channelId)
@@ -212,4 +227,144 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    private val scheduleRepository by lazy {
+        com.example.schedule.MedicationScheduleRepository(
+            dao = dao,
+            notificationScheduler = com.example.schedule.ReminderNotificationScheduler(getApplication())
+        )
+    }
+
+    fun deleteMedicine(medicineId: Int, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                scheduleRepository.onMedicineDeletedFromCabinet(medicineId)
+                dao.deleteMedicineCompletely(medicineId)
+            } catch (_: Exception) {
+                try {
+                    dao.deleteMedicineById(medicineId)
+                } catch (_: Exception) {}
+            }
+            onComplete()
+        }
+    }
+
+    fun logUsedQuantity(
+        medicineId: Int,
+        inventoryItemId: Int?,
+        currentQuantity: Double,
+        amountUsed: Double,
+        onComplete: () -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val newQty = (currentQuantity - amountUsed).coerceAtLeast(0.0)
+            if (inventoryItemId != null && inventoryItemId > 0) {
+                dao.updateInventoryQuantity(inventoryItemId, newQty)
+            } else {
+                val existing = dao.getInventoryItemsForMedicine(medicineId).firstOrNull()?.firstOrNull()
+                if (existing != null) {
+                    dao.updateInventoryQuantity(existing.id, (existing.quantity - amountUsed).coerceAtLeast(0.0))
+                } else {
+                    dao.insertInventoryItem(
+                        InventoryItem(
+                            medicineId = medicineId,
+                            familyMemberId = null,
+                            quantity = newQty,
+                            unit = null,
+                            purchaseDate = System.currentTimeMillis(),
+                            expiryDate = System.currentTimeMillis() + 365L * 24 * 60 * 60 * 1000,
+                            batchNumber = null,
+                            storageLocation = null,
+                            needsRefrigeration = false,
+                            usageMode = null,
+                            userNotes = null
+                        )
+                    )
+                }
+            }
+            onComplete()
+        }
+    }
+
+    // Keep backwards-compatible overload
+    fun logUsedQuantity(inventoryItemId: Int, currentQuantity: Double, amountUsed: Double, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            val newQty = (currentQuantity - amountUsed).coerceAtLeast(0.0)
+            dao.updateInventoryQuantity(inventoryItemId, newQty)
+            onComplete()
+        }
+    }
+
+    fun updateMedicineWithInventory(
+        medicine: Medicine,
+        inventoryItem: InventoryItem?,
+        categoryIds: Set<Int> = emptySet(),
+        onComplete: () -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            dao.updateMedicine(medicine)
+            if (inventoryItem != null) {
+                if (inventoryItem.id > 0) {
+                    dao.updateInventoryItem(inventoryItem)
+                } else {
+                    dao.insertInventoryItem(inventoryItem.copy(medicineId = medicine.id))
+                }
+            }
+            if (categoryIds.isNotEmpty()) {
+                dao.deleteMedicineCategories(medicine.id)
+                categoryIds.forEach { catId ->
+                    dao.insertMedicineCategory(MedicineCategoryCrossRef(medicine.id, catId))
+                }
+            }
+            scheduleRepository.onMedicineInventoryUpdated(medicine.id)
+            onComplete()
+        }
+    }
+
+    fun insertOrUpdateInventoryItem(
+        medicineId: Int,
+        quantity: Double,
+        unit: String?,
+        expiryDate: Long,
+        storageLocation: String?,
+        needsRefrigeration: Boolean,
+        onComplete: () -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val existing = dao.getInventoryItemsForMedicine(medicineId).firstOrNull()?.firstOrNull()
+            if (existing != null) {
+                dao.updateInventoryItem(
+                    existing.copy(
+                        quantity = quantity,
+                        unit = unit ?: existing.unit,
+                        expiryDate = expiryDate,
+                        storageLocation = storageLocation,
+                        needsRefrigeration = needsRefrigeration
+                    )
+                )
+            } else {
+                dao.insertInventoryItem(
+                    InventoryItem(
+                        medicineId = medicineId,
+                        familyMemberId = null,
+                        quantity = quantity,
+                        unit = unit,
+                        purchaseDate = System.currentTimeMillis(),
+                        expiryDate = expiryDate,
+                        batchNumber = null,
+                        storageLocation = storageLocation,
+                        needsRefrigeration = needsRefrigeration,
+                        usageMode = null,
+                        userNotes = null
+                    )
+                )
+            }
+            scheduleRepository.onMedicineInventoryUpdated(medicineId)
+            onComplete()
+        }
+    }
+
+    fun getInventoryForMedicine(medicineId: Int): Flow<List<InventoryItem>> = dao.getInventoryItemsForMedicine(medicineId)
+
+    fun getCategoriesForMedicine(medicineId: Int): Flow<List<Int>> = dao.getCategoryIdsForMedicine(medicineId)
 }

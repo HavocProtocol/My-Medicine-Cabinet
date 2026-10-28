@@ -51,6 +51,11 @@ object LocalLlmConfig {
         return prefs.getInt(KEY_THEME_MODE, 0)
     }
 
+    fun hasThemeModeConfigured(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.contains(KEY_THEME_MODE)
+    }
+
     fun setThemeMode(context: Context, mode: Int) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()

@@ -218,7 +218,7 @@ suspend fun performGeminiSearch(query: String, context: Context): String = withC
 
         val requestBody = jsonObj.toString().toRequestBody("application/json".toMediaType())
         val request = Request.Builder()
-            .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=$apiKey")
+            .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey")
             .post(requestBody)
             .build()
 

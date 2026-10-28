@@ -27,12 +27,20 @@ class MainActivity : AppCompatActivity() {
         val isLangInit = prefs.getBoolean("lang_initialized", false)
         
         if (!isLangInit) {
-            // Only force Arabic if the user hasn't completed onboarding yet (meaning it's a fresh install)
-            // If they already completed onboarding before this update, we just mark it as initialized without changing their current language.
-            if (!isOnboardingComplete && androidx.appcompat.app.AppCompatDelegate.getApplicationLocales().isEmpty) {
-                androidx.appcompat.app.AppCompatDelegate.setApplicationLocales(androidx.core.os.LocaleListCompat.forLanguageTags("ar"))
-            }
+            // Only apply default Light mode and English if the user hasn't completed onboarding yet (fresh install).
+            // Users who already configured the app keep their existing theme and language untouched.
+            val isFreshInstall = !isOnboardingComplete &&
+                androidx.appcompat.app.AppCompatDelegate.getApplicationLocales().isEmpty &&
+                !LocalLlmConfig.hasThemeModeConfigured(this)
+
             prefs.edit().putBoolean("lang_initialized", true).apply()
+
+            if (isFreshInstall) {
+                LocalLlmConfig.setThemeMode(this, 1) // 1 = Light Mode
+                androidx.appcompat.app.AppCompatDelegate.setApplicationLocales(
+                    androidx.core.os.LocaleListCompat.forLanguageTags("en")
+                )
+            }
         }
 
         setContent {
