@@ -627,9 +627,12 @@ class MedicationScheduleRepository(
         var deductedAmt = dose.deductedAmount
         val shouldAutoDeduct = schedule?.autoDeductInventory ?: true
 
+        var autoCompletedOneTimeSchedule = false
+
         if (shouldAutoDeduct && !deductedFlag) {
+            val targetMedId = dose.medicineId ?: schedule?.medicineId
             val invItem = resolveInventoryItem(
-                medicineId = dose.medicineId ?: schedule?.medicineId,
+                medicineId = targetMedId,
                 inventoryItemId = dose.inventoryItemId ?: schedule?.inventoryItemId
             )
             if (invItem != null && invItem.quantity > 0.0) {
@@ -639,14 +642,26 @@ class MedicationScheduleRepository(
                 deductedFlag = true
                 deductedAmt = deduct
 
-                val lowThreshold = schedule?.lowStockThreshold ?: 5.0
-                if (newQty <= lowThreshold) {
-                    notificationScheduler?.showLowStockNotification(
-                        medicineName = dose.medicineName,
-                        remainingQty = newQty,
-                        unit = invItem.unit?.ifBlank { dose.dosageUnit } ?: dose.dosageUnit,
-                        medicineId = invItem.medicineId
-                    )
+                val medicine = targetMedId?.takeIf { it > 0 }?.let { dao.getMedicineById(it) }
+                val classification = com.example.data.MedicationRefillClassification.fromKey(medicine?.refillClassification)
+                val totalRemainingForMed = if (targetMedId != null && targetMedId > 0) {
+                    dao.getInventoryItemsForMedicineSnapshot(targetMedId).sumOf { it.quantity.coerceAtLeast(0.0) }
+                } else {
+                    newQty
+                }
+
+                if (classification == com.example.data.MedicationRefillClassification.ONGOING_REFILL) {
+                    val lowThreshold = schedule?.lowStockThreshold ?: 5.0
+                    if (totalRemainingForMed <= lowThreshold) {
+                        notificationScheduler?.showLowStockNotification(
+                            medicineName = dose.medicineName,
+                            remainingQty = totalRemainingForMed,
+                            unit = invItem.unit?.ifBlank { dose.dosageUnit } ?: dose.dosageUnit,
+                            medicineId = invItem.medicineId
+                        )
+                    }
+                } else if (classification == com.example.data.MedicationRefillClassification.ONE_TIME && totalRemainingForMed <= 0.0) {
+                    autoCompletedOneTimeSchedule = true
                 }
             }
         }
@@ -662,6 +677,21 @@ class MedicationScheduleRepository(
         )
         dao.updateDoseRecord(updated)
         notificationScheduler?.cancelDoseAlarm(updated.occurrenceKey, updated.notificationId)
+
+        // If a ONE_TIME medication has finished its supply/course, complete the routine so it does not recur indefinitely
+        if (autoCompletedOneTimeSchedule && schedule != null && schedule.status == ScheduleStatus.ACTIVE.key) {
+            val allScheduleDoses = dao.getDoseRecordsForScheduleSnapshot(schedule.id)
+            val pendingDoses = allScheduleDoses.filter { it.status == DoseStatus.PENDING.key && it.id != updated.id }
+            notificationScheduler?.cancelAllAlarmsForSchedule(schedule.id, pendingDoses)
+            dao.deleteAllPendingDosesForSchedule(schedule.id)
+            dao.updateSchedule(
+                schedule.copy(
+                    status = ScheduleStatus.COMPLETED.key,
+                    updatedAt = nowMillis
+                )
+            )
+        }
+
         return Result.success(updated)
     }
 
@@ -799,24 +829,97 @@ class MedicationScheduleRepository(
     }
 
     /**
-     * Synchronizes schedule state when a medicine or its inventory item is updated in the cabinet.
+     * Synchronizes schedule state when a medicine, its inventory quantity/expiry, or its refill
+     * classification (ONGOING_REFILL vs ONE_TIME) is updated in the cabinet.
      */
     suspend fun onMedicineInventoryUpdated(
         medicineId: Int,
         nowMillis: Long = System.currentTimeMillis(),
         timeZone: TimeZone = TimeZone.getDefault()
     ) {
+        val medicine = dao.getMedicineById(medicineId)
+        val classification = com.example.data.MedicationRefillClassification.fromKey(medicine?.refillClassification)
+        val totalRemainingStock = dao.getInventoryItemsForMedicineSnapshot(medicineId)
+            .sumOf { it.quantity.coerceAtLeast(0.0) }
         val linkedSchedules = dao.getSchedulesForMedicineSnapshot(medicineId)
         val latestExpiry = resolveExpiryMillis(medicineId, null, null)
+        val todayIso = MedicationScheduleEngine.millisToLocalDateIso(nowMillis, timeZone)
+
         for (sched in linkedSchedules) {
             if (sched.status == ScheduleStatus.DISCONTINUED.key) continue
-            dao.updateSchedule(
-                sched.copy(
-                    recordedExpiryDateMillis = latestExpiry,
-                    updatedAt = nowMillis
+
+            val isWithinEndDate = sched.endDateIso.isNullOrBlank() || todayIso <= sched.endDateIso
+
+            if (classification == com.example.data.MedicationRefillClassification.ONE_TIME &&
+                totalRemainingStock <= 0.0 &&
+                sched.status == ScheduleStatus.ACTIVE.key
+            ) {
+                // One-time medication depleted -> mark routine COMPLETED and cancel future pending reminders
+                val doses = dao.getDoseRecordsForScheduleSnapshot(sched.id)
+                val pendingDoses = doses.filter { it.status == DoseStatus.PENDING.key }
+                notificationScheduler?.cancelAllAlarmsForSchedule(sched.id, pendingDoses)
+                dao.deleteAllPendingDosesForSchedule(sched.id)
+                dao.updateSchedule(
+                    sched.copy(
+                        status = ScheduleStatus.COMPLETED.key,
+                        recordedExpiryDateMillis = latestExpiry,
+                        updatedAt = nowMillis
+                    )
                 )
-            )
-            evaluateAndEnforceExpiryProtection(sched.userId, nowMillis, timeZone)
+            } else if (sched.status == ScheduleStatus.COMPLETED.key &&
+                isWithinEndDate &&
+                (totalRemainingStock > 0.0 || classification == com.example.data.MedicationRefillClassification.ONGOING_REFILL)
+            ) {
+                // Restocked or reclassified to ONGOING_REFILL -> reactivate if expiry is valid
+                val expiryEval = MedicationScheduleEngine.evaluateExpirySafety(
+                    medicineName = sched.medicineName,
+                    expiryDateMillis = latestExpiry,
+                    referenceTimeMillis = nowMillis,
+                    timeZone = timeZone
+                )
+                if (expiryEval.canActivateSchedule) {
+                    dao.updateSchedule(
+                        sched.copy(
+                            status = ScheduleStatus.ACTIVE.key,
+                            recordedExpiryDateMillis = latestExpiry,
+                            blockedReason = null,
+                            updatedAt = nowMillis
+                        )
+                    )
+                    ensureOccurrencesGeneratedForRange(
+                        userId = sched.userId,
+                        fromDateIso = todayIso,
+                        daysCount = 8,
+                        nowMillis = nowMillis,
+                        timeZone = timeZone
+                    )
+                } else {
+                    dao.updateSchedule(
+                        sched.copy(
+                            recordedExpiryDateMillis = latestExpiry,
+                            updatedAt = nowMillis
+                        )
+                    )
+                    evaluateAndEnforceExpiryProtection(sched.userId, nowMillis, timeZone)
+                }
+            } else {
+                dao.updateSchedule(
+                    sched.copy(
+                        recordedExpiryDateMillis = latestExpiry,
+                        updatedAt = nowMillis
+                    )
+                )
+                evaluateAndEnforceExpiryProtection(sched.userId, nowMillis, timeZone)
+                if (sched.status == ScheduleStatus.ACTIVE.key && totalRemainingStock > 0.0) {
+                    ensureOccurrencesGeneratedForRange(
+                        userId = sched.userId,
+                        fromDateIso = todayIso,
+                        daysCount = 8,
+                        nowMillis = nowMillis,
+                        timeZone = timeZone
+                    )
+                }
+            }
         }
     }
 

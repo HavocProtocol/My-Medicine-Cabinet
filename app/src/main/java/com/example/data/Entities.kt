@@ -3,6 +3,16 @@ package com.example.data
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 
+enum class MedicationRefillClassification(val key: String, val displayLabel: String) {
+    ONGOING_REFILL("ONGOING_REFILL", "Ongoing Medication — Requires Refills"),
+    ONE_TIME("ONE_TIME", "One-Time Medication");
+
+    companion object {
+        fun fromKey(key: String?): MedicationRefillClassification =
+            entries.find { it.key.equals(key, ignoreCase = true) } ?: ONE_TIME
+    }
+}
+
 @Entity(tableName = "medicines",
     foreignKeys = [ForeignKey(entity = SourceReference::class, parentColumns = ["id"], childColumns = ["sourceId"], onDelete = ForeignKey.SET_NULL)]
 )
@@ -19,7 +29,11 @@ data class Medicine(
     val warnings: String?,
     @ColumnInfo(index = true) val sourceId: Int?,
     val createdAt: Long,
-    val isSynced: Boolean = false
+    val isSynced: Boolean = false,
+    val refillClassification: String = MedicationRefillClassification.ONE_TIME.key,
+    val prescribedDosage: String? = null,
+    val administrationRoute: String? = null,
+    val expirationStatus: String = "ACTIVE"
 )
 
 @Entity(tableName = "inventory_items",
@@ -180,4 +194,71 @@ data class DoseRecord(
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )
+
+@Entity(
+    tableName = "support_conversations",
+    indices = [
+        Index(value = ["conversationUid"], unique = true),
+        Index(value = ["userId"]),
+        Index(value = ["status"]),
+        Index(value = ["telegramTopicId"])
+    ]
+)
+data class SupportConversation(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val conversationUid: String,
+    val userId: String = "default_user",
+    val userReference: String,
+    val subject: String = "Medicine Cabinet Support",
+    val status: String = "OPEN", // OPEN, WAITING_FOR_SUPPORT, REPLIED, CLOSED
+    val telegramTopicId: Int? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+    val lastMessagePreview: String? = null
+)
+
+@Entity(
+    tableName = "support_messages",
+    indices = [
+        Index(value = ["conversationId"]),
+        Index(value = ["conversationUid"]),
+        Index(value = ["userId"]),
+        Index(value = ["clientIdempotencyKey"], unique = true),
+        Index(value = ["telegramMessageId"])
+    ]
+)
+data class SupportMessage(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val conversationId: Int,
+    val conversationUid: String,
+    val userId: String = "default_user",
+    val senderType: String, // USER, SUPPORT_AGENT, SYSTEM
+    val senderName: String? = null,
+    val senderTelegramUserId: Long? = null,
+    val messageText: String,
+    val deliveryStatus: String = "SENDING", // SENDING, SENT_TO_TELEGRAM, DELIVERED, FAILED
+    val clientIdempotencyKey: String,
+    val telegramChatId: Long? = null,
+    val telegramMessageId: Long? = null,
+    val replyToTelegramMessageId: Long? = null,
+    val telegramUpdateId: Long? = null,
+    val errorMessage: String? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "processed_telegram_updates",
+    indices = [
+        Index(value = ["telegramMessageId"])
+    ]
+)
+data class ProcessedTelegramUpdate(
+    @PrimaryKey val updateId: Long,
+    val telegramMessageId: Long,
+    val conversationUid: String? = null,
+    val status: String, // ROUTED, IGNORED_UNMATCHED, REJECTED_UNAUTHORIZED
+    val processedAt: Long = System.currentTimeMillis()
+)
+
 

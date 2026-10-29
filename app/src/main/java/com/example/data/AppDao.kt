@@ -184,5 +184,83 @@ interface AppDao {
 
     @Query("SELECT * FROM inventory_items WHERE id = :id LIMIT 1")
     suspend fun getInventoryItemById(id: Int): InventoryItem?
+
+    @Query("UPDATE medicines SET expirationStatus = :status WHERE id = :medicineId")
+    suspend fun updateMedicineExpirationStatus(medicineId: Int, status: String)
+
+    @Query("UPDATE medicines SET refillClassification = :classification WHERE id = :medicineId")
+    suspend fun updateMedicineRefillClassification(medicineId: Int, classification: String)
+
+    @Query("SELECT * FROM dose_records WHERE userId = :userId AND status = 'TAKEN' AND actualTakenTimestampMillis IS NOT NULL ORDER BY actualTakenTimestampMillis DESC, scheduledDateIso DESC, scheduledTimeHm DESC, id DESC")
+    fun getCompletedDoseRecordsForUser(userId: String): Flow<List<DoseRecord>>
+
+    // --- Online Help Center & Telegram Live Chat Support ---
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertSupportConversationIgnore(conversation: SupportConversation): Long
+
+    @Update
+    suspend fun updateSupportConversation(conversation: SupportConversation)
+
+    @Query("SELECT * FROM support_conversations WHERE userId = :userId AND status != 'CLOSED' ORDER BY updatedAt DESC LIMIT 1")
+    suspend fun getActiveSupportConversationForUser(userId: String): SupportConversation?
+
+    @Query("SELECT * FROM support_conversations WHERE userId = :userId AND status != 'CLOSED' ORDER BY updatedAt DESC LIMIT 1")
+    fun observeActiveSupportConversationForUser(userId: String): Flow<SupportConversation?>
+
+    @Query("SELECT * FROM support_conversations WHERE id = :id AND userId = :userId LIMIT 1")
+    suspend fun getSupportConversationById(id: Int, userId: String): SupportConversation?
+
+    @Query("SELECT * FROM support_conversations WHERE conversationUid = :conversationUid LIMIT 1")
+    suspend fun getSupportConversationByUid(conversationUid: String): SupportConversation?
+
+    @Query("SELECT * FROM support_conversations WHERE telegramTopicId = :topicId AND status != 'CLOSED' ORDER BY updatedAt DESC LIMIT 1")
+    suspend fun getSupportConversationByTopicId(topicId: Int): SupportConversation?
+
+    @Query("SELECT * FROM support_conversations WHERE userId = :userId ORDER BY updatedAt DESC")
+    fun getSupportConversationsForUser(userId: String): Flow<List<SupportConversation>>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertSupportMessageIgnore(message: SupportMessage): Long
+
+    @Update
+    suspend fun updateSupportMessage(message: SupportMessage)
+
+    @Query("SELECT * FROM support_messages WHERE id = :id AND userId = :userId LIMIT 1")
+    suspend fun getSupportMessageById(id: Int, userId: String): SupportMessage?
+
+    @Query("SELECT * FROM support_messages WHERE clientIdempotencyKey = :idempotencyKey LIMIT 1")
+    suspend fun getSupportMessageByIdempotencyKey(idempotencyKey: String): SupportMessage?
+
+    @Query("SELECT * FROM support_messages WHERE telegramMessageId = :telegramMessageId LIMIT 1")
+    suspend fun getSupportMessageByTelegramMessageId(telegramMessageId: Long): SupportMessage?
+
+    @Query("SELECT * FROM support_messages WHERE conversationId = :conversationId AND senderType = 'USER' ORDER BY createdAt DESC, id DESC LIMIT 1")
+    suspend fun getLatestUserSupportMessageForConversation(conversationId: Int): SupportMessage?
+
+    @Query("SELECT * FROM support_messages WHERE conversationId = :conversationId AND userId = :userId ORDER BY createdAt ASC, id ASC")
+    fun observeSupportMessagesForConversation(conversationId: Int, userId: String): Flow<List<SupportMessage>>
+
+    @Query("SELECT * FROM support_messages WHERE conversationId = :conversationId AND userId = :userId ORDER BY createdAt ASC, id ASC")
+    suspend fun getSupportMessagesForConversationSnapshot(conversationId: Int, userId: String): List<SupportMessage>
+
+    @Query("SELECT * FROM support_messages WHERE userId = :userId ORDER BY createdAt ASC, id ASC")
+    fun observeAllSupportMessagesForUser(userId: String): Flow<List<SupportMessage>>
+
+    @Query("SELECT * FROM support_messages WHERE userId = :userId ORDER BY createdAt ASC, id ASC")
+    suspend fun getSupportMessagesForUserSnapshot(userId: String): List<SupportMessage>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertProcessedTelegramUpdate(update: ProcessedTelegramUpdate): Long
+
+    @Query("SELECT * FROM processed_telegram_updates WHERE updateId = :updateId LIMIT 1")
+    suspend fun getProcessedTelegramUpdateById(updateId: Long): ProcessedTelegramUpdate?
+
+    @Query("SELECT * FROM processed_telegram_updates WHERE telegramMessageId = :telegramMessageId AND status = 'ROUTED' LIMIT 1")
+    suspend fun getProcessedTelegramUpdateByMessageId(telegramMessageId: Long): ProcessedTelegramUpdate?
+
+    @Query("SELECT MAX(updateId) FROM processed_telegram_updates")
+    suspend fun getMaxProcessedTelegramUpdateId(): Long?
 }
+
 

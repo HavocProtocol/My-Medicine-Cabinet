@@ -12,16 +12,23 @@ object MedicationScheduleEngine {
 
     private val ISO_DATE_REGEX = Regex("""^(\d{4})-(\d{2})-(\d{2})$""")
     private val TIME_HM_REGEX = Regex("""^([01]\d|2[0-3]):([0-5]\d)$""")
-    const val EXPIRING_SOON_DAYS = 30
+    const val EXPIRING_SOON_DAYS = 7
 
     /**
      * Converts epoch milliseconds to "YYYY-MM-DD" in the given [timeZone].
+     * If [millis] is an exact UTC midnight timestamp (as produced by Material3 DatePicker),
+     * it is interpreted in UTC to prevent off-by-one-day shifts in negative timezone offsets.
      */
     fun millisToLocalDateIso(
         millis: Long,
         timeZone: TimeZone = TimeZone.getDefault()
     ): String {
-        val cal = Calendar.getInstance(timeZone, Locale.US).apply {
+        val effectiveTz = if (millis > 0L && millis % 86_400_000L == 0L) {
+            TimeZone.getTimeZone("UTC")
+        } else {
+            timeZone
+        }
+        val cal = Calendar.getInstance(effectiveTz, Locale.US).apply {
             timeInMillis = millis
         }
         val y = cal.get(Calendar.YEAR)
@@ -194,20 +201,21 @@ object MedicationScheduleEngine {
     }
 
     /**
-     * Evaluates a medicine's expiration status using the consistent Date-Only + timestamp rule.
+     * Evaluates a medicine's expiration status using the consistent local-date rule.
      *
      * Rules:
      * 1. Missing expiryDateMillis (null or <= 0L) -> MISSING_EXPIRY (cannot activate without confirming/entering date).
      * 2. Invalid date (outside 1990..2100) -> INVALID_EXPIRY (cannot activate).
-     * 3. Already expired (expiryDateMillis <= referenceTimeMillis OR expiryDateIso < referenceDateIso) -> EXPIRED (strictly blocked).
-     * 4. Expiring within 30 days (daysRemaining in 0..30) -> EXPIRING_SOON (requires user review acknowledgment).
-     * 5. Otherwise -> VALID.
+     * 3. Already expired (expiry date is today or earlier: daysRemaining <= 0 OR expiryDateMillis <= referenceTimeMillis) -> EXPIRED (strictly blocked).
+     * 4. Expiring within [warningDays] (default 7 days: daysRemaining in 1..warningDays) -> EXPIRING_SOON (requires user review acknowledgment).
+     * 5. Otherwise (daysRemaining > warningDays) -> VALID.
      */
     fun evaluateExpirySafety(
         medicineName: String,
         expiryDateMillis: Long?,
         referenceTimeMillis: Long = System.currentTimeMillis(),
-        timeZone: TimeZone = TimeZone.getDefault()
+        timeZone: TimeZone = TimeZone.getDefault(),
+        warningDays: Int = EXPIRING_SOON_DAYS
     ): ExpiryEvaluationResult {
         if (expiryDateMillis == null || expiryDateMillis <= 0L) {
             return ExpiryEvaluationResult(
@@ -237,24 +245,34 @@ object MedicationScheduleEngine {
             )
         }
 
-        val referenceIso = millisToLocalDateIso(referenceTimeMillis, timeZone)
+        val referenceCal = Calendar.getInstance(timeZone, Locale.US).apply {
+            timeInMillis = referenceTimeMillis
+        }
+        val referenceIso = String.format(
+            Locale.US,
+            "%04d-%02d-%02d",
+            referenceCal.get(Calendar.YEAR),
+            referenceCal.get(Calendar.MONTH) + 1,
+            referenceCal.get(Calendar.DAY_OF_MONTH)
+        )
         val daysRem = daysBetween(referenceIso, expiryIso)
 
-        // Strict expiry check: if calendar date is before today OR exact timestamp has passed
-        if (daysRem < 0 || expiryDateMillis <= referenceTimeMillis) {
+        // Strict expiry check: if calendar date is today or earlier (daysRem <= 0) OR exact timestamp has passed
+        if (daysRem <= 0 || expiryDateMillis <= referenceTimeMillis) {
             return ExpiryEvaluationResult(
                 status = ExpirySafetyStatus.EXPIRED,
                 medicineName = medicineName,
                 expiryDateMillis = expiryDateMillis,
                 expiryDateIso = expiryIso,
-                daysRemaining = daysRem.coerceAtMost(-1),
+                daysRemaining = daysRem.coerceAtMost(0),
                 canActivateSchedule = false,
                 requiresExpiringSoonAcknowledgment = false,
                 requiresExpiryEntry = false
             )
         }
 
-        if (daysRem <= EXPIRING_SOON_DAYS) {
+        val effectiveWarningDays = warningDays.coerceAtLeast(1)
+        if (daysRem <= effectiveWarningDays) {
             return ExpiryEvaluationResult(
                 status = ExpirySafetyStatus.EXPIRING_SOON,
                 medicineName = medicineName,
@@ -286,7 +304,7 @@ object MedicationScheduleEngine {
         medicineName: String,
         expiryDateIso: String
     ): String {
-        return "⚠️ This medicine ($medicineName) has expired. Its recorded expiration date is $expiryDateIso. You cannot add it to an active medication schedule. Please verify the packaging and consult a pharmacist or healthcare professional about a suitable replacement."
+        return "This medicine has expired and cannot be scheduled. Please select a medicine that has not expired. (Medicine: $medicineName, Expiry: $expiryDateIso)"
     }
 
     /**
@@ -295,7 +313,8 @@ object MedicationScheduleEngine {
     fun validateScheduleDraft(
         draft: ScheduleDraftInput,
         referenceTimeMillis: Long = System.currentTimeMillis(),
-        timeZone: TimeZone = TimeZone.getDefault()
+        timeZone: TimeZone = TimeZone.getDefault(),
+        warningDays: Int = EXPIRING_SOON_DAYS
     ): ScheduleValidationResult {
         val errors = mutableListOf<ScheduleValidationError>()
 
@@ -355,7 +374,8 @@ object MedicationScheduleEngine {
             medicineName = draft.medicineName,
             expiryDateMillis = draft.recordedExpiryDateMillis,
             referenceTimeMillis = referenceTimeMillis,
-            timeZone = timeZone
+            timeZone = timeZone,
+            warningDays = warningDays
         )
 
         when (expiryEval.status) {
@@ -436,7 +456,7 @@ object MedicationScheduleEngine {
         )
         val isBlockedByExpiry = schedule.status == ScheduleStatus.BLOCKED_EXPIRED.key ||
             !expiryEval.canActivateSchedule ||
-            (expiryEval.expiryDateIso != null && dateIso > expiryEval.expiryDateIso)
+            (expiryEval.expiryDateIso != null && dateIso >= expiryEval.expiryDateIso)
 
         return slots.mapNotNull { slot ->
             val timestamp = combineDateAndTimeToMillis(dateIso, slot.timeHm, timeZone) ?: return@mapNotNull null
@@ -503,6 +523,30 @@ object MedicationScheduleEngine {
     }
 
     /**
+     * Filters dose records for the History section:
+     * - Displays ONLY dosage occurrences that have actually been completed (status == TAKEN and actualTakenTimestampMillis != null).
+     * - Strictly excludes future scheduled dosages and PENDING occurrences.
+     * - Never treats a dose as completed merely because its scheduled time has passed.
+     */
+    fun filterCompletedHistoryDoses(
+        records: List<DoseRecord>,
+        referenceTimeMillis: Long = System.currentTimeMillis(),
+        timeZone: TimeZone = TimeZone.getDefault()
+    ): List<DoseRecord> {
+        val todayIso = millisToLocalDateIso(referenceTimeMillis, timeZone)
+        return records.filter { rec ->
+            rec.status == DoseStatus.TAKEN.key &&
+                rec.actualTakenTimestampMillis != null &&
+                rec.scheduledDateIso <= todayIso
+        }.sortedWith(
+            compareByDescending<DoseRecord> { it.actualTakenTimestampMillis ?: it.scheduledTimestampMillis }
+                .thenByDescending { it.scheduledDateIso }
+                .thenByDescending { it.scheduledTimeHm }
+                .thenByDescending { it.id }
+        )
+    }
+
+    /**
      * Detects multiple doses scheduled for the exact same date and time.
      */
     fun detectOverlappingDoses(doses: List<DoseRecord>): List<OverlappingTimeSlotGroup> {
@@ -520,14 +564,45 @@ object MedicationScheduleEngine {
             .sortedWith(compareBy({ it.dateIso }, { it.timeHm }))
     }
 
+    private enum class UnitFamily {
+        TABLET, CAPSULE, LIQUID_ML, DROP, PUFF, INJECTION, SACHET, APPLICATION, PACKAGE_GENERIC, UNKNOWN
+    }
+
+    private fun resolveUnitFamilyAndFactorToBase(rawUnit: String?): Pair<UnitFamily, Double> {
+        val u = rawUnit?.trim()?.lowercase(Locale.ROOT).orEmpty()
+        if (u.isEmpty()) return UnitFamily.PACKAGE_GENERIC to 1.0
+        return when {
+            u in setOf("package", "pack", "box", "bottle", "عبوة", "علبة") -> UnitFamily.PACKAGE_GENERIC to 1.0
+            u in setOf("tablet", "tablets", "tab", "tabs", "pill", "pills", "أقراص", "قرص", "comprimé", "comprimés", "tablette", "tabletten") -> UnitFamily.TABLET to 1.0
+            u in setOf("capsule", "capsules", "cap", "caps", "كبسولات", "كبسولة", "gélule", "gélules", "kapsel", "kapseln") -> UnitFamily.CAPSULE to 1.0
+            u in setOf("ml", "milliliter", "milliliters", "syrup", "شراب", "مل", "sirop", "sirup") -> UnitFamily.LIQUID_ML to 1.0
+            u in setOf("tsp", "teaspoon", "teaspoons", "ملعقة صغيرة") -> UnitFamily.LIQUID_ML to 5.0
+            u in setOf("tbsp", "tablespoon", "tablespoons", "ملعقة كبيرة") -> UnitFamily.LIQUID_ML to 15.0
+            u in setOf("drop", "drops", "قطرات", "قطرة", "goutte", "gouttes", "tropfen") -> UnitFamily.DROP to 1.0
+            u in setOf("puff", "puffs", "spray", "sprays", "بخاخ", "بخة") -> UnitFamily.PUFF to 1.0
+            u in setOf("injection", "injections", "ampoule", "vial", "unit", "units", "iu", "حقن", "حقنة") -> UnitFamily.INJECTION to 1.0
+            u in setOf("sachet", "sachets", "packet", "packets", "powder", "أكياس", "كيس", "بودرة") -> UnitFamily.SACHET to 1.0
+            u in setOf("application", "applications", "cream", "ointment", "gel", "كريم", "مرهم") -> UnitFamily.APPLICATION to 1.0
+            else -> UnitFamily.UNKNOWN to 1.0
+        }
+    }
+
     /**
-     * Calculates upcoming 7-day required quantity for each medicine and checks inventory sufficiency.
+     * Calculates upcoming [daysAhead]-day required quantity for each medicine and checks inventory sufficiency.
+     *
+     * Fixes:
+     * 1. Sums available quantity across all valid (non-expired) inventory records for the medicine.
+     * 2. Accounts for doses on [startDateIso] (today) that have already been taken/deducted or skipped so today is never double-counted.
+     * 3. Respects schedule start/end dates and unit conversions/compatibility.
+     * 4. Only flags [InventorySufficiencyInfo.isInsufficientForUpcoming] when available quantity < required quantity.
      */
     fun evaluateInventorySufficiency(
         schedules: List<MedicationSchedule>,
         inventoryItems: List<InventoryItem>,
         startDateIso: String,
-        daysAhead: Int = 7
+        daysAhead: Int = 7,
+        existingDoseRecords: List<DoseRecord> = emptyList(),
+        timeZone: TimeZone = TimeZone.getDefault()
     ): List<InventorySufficiencyInfo> {
         val activeSchedules = schedules.filter { it.status == ScheduleStatus.ACTIVE.key && it.medicineId != null }
         if (activeSchedules.isEmpty()) return emptyList()
@@ -537,36 +612,87 @@ object MedicationScheduleEngine {
 
         for ((medId, medSchedules) in byMedId) {
             val firstSched = medSchedules.first()
-            val invItem = firstSched.inventoryItemId?.let { id -> inventoryItems.find { it.id == id } }
-                ?: inventoryItems.filter { it.medicineId == medId }.maxByOrNull { it.expiryDate }
+            val allMedItems = inventoryItems.filter { it.medicineId == medId }
+            val nonExpiredItems = allMedItems.filter { item ->
+                val expIso = millisToLocalDateIso(item.expiryDate, timeZone)
+                daysBetween(startDateIso, expIso) > 0
+            }
+            val effectiveItems = nonExpiredItems.ifEmpty { allMedItems }
+            val primaryItem = firstSched.inventoryItemId?.let { id -> effectiveItems.find { it.id == id } }
+                ?: effectiveItems.maxByOrNull { it.expiryDate }
 
-            var requiredTotal = 0.0
-            for (dayOffset in 0 until daysAhead) {
+            val (schedFamily, schedFactor) = resolveUnitFamilyAndFactorToBase(firstSched.dosageUnit)
+
+            // Calculate total available quantity in the schedule's dosage unit
+            var unitMismatchWarning: String? = null
+            val recordedQtyInSchedUnit: Double? = if (effectiveItems.isEmpty()) {
+                null
+            } else {
+                var sumInBase = 0.0
+                for (item in effectiveItems) {
+                    val rawItemUnit = item.unit?.trim()?.ifBlank { null } ?: firstSched.formulation
+                    val (itemFamily, itemFactor) = resolveUnitFamilyAndFactorToBase(rawItemUnit)
+                    when {
+                        itemFamily == schedFamily -> {
+                            sumInBase += item.quantity * itemFactor
+                        }
+                        itemFamily == UnitFamily.PACKAGE_GENERIC || schedFamily == UnitFamily.PACKAGE_GENERIC -> {
+                            // Generic package/unit entry: treat numeric quantity as matching schedule dosage unit
+                            sumInBase += item.quantity * schedFactor
+                        }
+                        else -> {
+                            unitMismatchWarning = "Inventory unit (${item.unit ?: "unknown"}) differs from schedule dosage unit (${firstSched.dosageUnit})."
+                            sumInBase += item.quantity * schedFactor
+                        }
+                    }
+                }
+                if (schedFactor > 0.0) sumInBase / schedFactor else sumInBase
+            }
+
+            // Calculate required quantity across the window, subtracting already-completed/skipped doses on startDateIso
+            var requiredTotalInSchedUnit = 0.0
+            for (dayOffset in 0 until daysAhead.coerceAtLeast(1)) {
                 val dateIso = addDaysToIso(startDateIso, dayOffset)
                 for (sched in medSchedules) {
                     if (isScheduleMatchingDate(sched, dateIso)) {
                         val slots = ScheduledTimeSlot.decodeList(sched.doseTimesJson)
-                        requiredTotal += slots.sumOf { if (it.dosage > 0.0) it.dosage else sched.defaultDosage }
+                        for (slot in slots) {
+                            val slotDose = if (slot.dosage > 0.0) slot.dosage else sched.defaultDosage
+                            val alreadyHandled = existingDoseRecords.any { rec ->
+                                rec.scheduleId == sched.id &&
+                                    rec.scheduledDateIso == dateIso &&
+                                    rec.scheduledTimeHm == slot.timeHm &&
+                                    (rec.status == DoseStatus.TAKEN.key || rec.status == DoseStatus.SKIPPED.key || rec.inventoryDeducted)
+                            }
+                            if (!alreadyHandled) {
+                                requiredTotalInSchedUnit += slotDose
+                            }
+                        }
                     }
                 }
             }
 
-            val recordedQty = invItem?.quantity
             val threshold = medSchedules.maxOfOrNull { it.lowStockThreshold } ?: 5.0
-            val isLow = recordedQty != null && recordedQty <= threshold
-            val isInsufficient = recordedQty != null && requiredTotal > recordedQty
+            val isInsufficient = unitMismatchWarning == null &&
+                recordedQtyInSchedUnit != null &&
+                (requiredTotalInSchedUnit > recordedQtyInSchedUnit + 1e-6)
+            val isLow = unitMismatchWarning == null &&
+                recordedQtyInSchedUnit != null &&
+                recordedQtyInSchedUnit <= threshold &&
+                isInsufficient
 
             results.add(
                 InventorySufficiencyInfo(
                     medicineId = medId,
-                    inventoryItemId = invItem?.id,
+                    inventoryItemId = primaryItem?.id,
                     medicineName = firstSched.medicineName,
-                    recordedQuantity = recordedQty,
-                    unit = invItem?.unit?.ifBlank { firstSched.dosageUnit } ?: firstSched.dosageUnit,
-                    upcoming7DayRequired = requiredTotal,
+                    recordedQuantity = recordedQtyInSchedUnit,
+                    unit = firstSched.dosageUnit.ifBlank { primaryItem?.unit ?: "unit" },
+                    upcoming7DayRequired = requiredTotalInSchedUnit,
                     lowStockThreshold = threshold,
                     isLowStock = isLow,
-                    isInsufficientForUpcoming = isInsufficient
+                    isInsufficientForUpcoming = isInsufficient,
+                    unitMismatchWarning = unitMismatchWarning
                 )
             )
         }

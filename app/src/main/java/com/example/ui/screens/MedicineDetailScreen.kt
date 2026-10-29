@@ -32,6 +32,9 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.R
 import com.example.data.InventoryItem
+import com.example.data.MedicationRefillClassification
+import com.example.safety.ExpiryService
+import com.example.safety.MedicineExpirationStatus
 import com.example.ui.utils.getLocalizedName
 import com.example.ui.viewmodels.AppViewModel
 import java.text.SimpleDateFormat
@@ -54,13 +57,19 @@ fun MedicineDetailScreen(
     val medCategoryIds by viewModel.getCategoriesForMedicine(medicineId).collectAsState(initial = emptyList())
     val medInventoryList by viewModel.getInventoryForMedicine(medicineId).collectAsState(initial = emptyList())
     val allInventory by viewModel.allInventoryItems.collectAsState()
+    val currentTime by viewModel.currentTimeMillis.collectAsState()
+    val warningDays by viewModel.expiryWarningDays.collectAsState()
 
     val medicine = allMedicines.find { it.id == medicineId }
     val inventory = medInventoryList.firstOrNull()
         ?: allInventory.find { it.medicineId == medicineId }
         ?: (availableItems + expiredItems).find { it.medicineId == medicineId }
 
-    val isExpired = inventory?.let { it.expiryDate < System.currentTimeMillis() } ?: false
+    val expStatus = inventory?.let {
+        ExpiryService.evaluateExpirationStatusMillis(currentTime, it.expiryDate, warningDays)
+    } ?: MedicineExpirationStatus.ACTIVE
+    val isExpired = expStatus == MedicineExpirationStatus.EXPIRED
+    val isExpiringSoon = expStatus == MedicineExpirationStatus.EXPIRING_SOON
     val dateFormatter = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
 
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -180,6 +189,7 @@ fun MedicineDetailScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
+                    .imePadding()
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -264,7 +274,7 @@ fun MedicineDetailScreen(
                     }
                 }
 
-                // Expired Warning Banner
+                // Expired / Expiring Soon Warning Banner
                 if (isExpired) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -288,6 +298,31 @@ fun MedicineDetailScreen(
                             )
                         }
                     }
+                } else if (isExpiringSoon && inventory != null) {
+                    val daysRem = ExpiryService.daysUntilMillis(currentTime, inventory.expiryDate).coerceAtLeast(1)
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF3C7))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.WarningAmber,
+                                contentDescription = null,
+                                tint = Color(0xFFB45309)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.expiring_soon_detail_banner, daysRem),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF92400E)
+                            )
+                        }
+                    }
                 }
 
                 // Inventory Details
@@ -305,6 +340,36 @@ fun MedicineDetailScreen(
                             )
                         )
                         Spacer(modifier = Modifier.height(10.dp))
+                        val classificationLabel = getLocalizedClassificationLabel(
+                            MedicationRefillClassification.fromKey(medicine.refillClassification),
+                            context
+                        )
+                        Text(
+                            text = stringResource(R.string.classification_label_prefix, classificationLabel),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        if (!medicine.prescribedDosage.isNullOrBlank()) {
+                            Text(
+                                text = stringResource(R.string.dosage_label_value, medicine.prescribedDosage),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                        }
+                        if (!medicine.administrationRoute.isNullOrBlank()) {
+                            Text(
+                                text = stringResource(
+                                    R.string.route_label_value,
+                                    getLocalizedRoute(medicine.administrationRoute, context)
+                                ),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                        }
                         if (inventory != null) {
                             val unitStr = getLocalizedUnit(inventory.unit, context)
                             Text(
@@ -315,7 +380,7 @@ fun MedicineDetailScreen(
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "${stringResource(R.string.expiry_date)}: ${dateFormatter.format(Date(inventory.expiryDate))}",
+                                text = "${stringResource(R.string.expiry_date)}: ${dateFormatter.format(Date(inventory.expiryDate))} (${expStatus.key})",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -627,6 +692,9 @@ fun MedicineDetailScreen(
         var editStorageLocation by remember { mutableStateOf(inventory?.storageLocation ?: "") }
         var editNeedsRefrig by remember { mutableStateOf(inventory?.needsRefrigeration ?: false) }
         var editIndications by remember { mutableStateOf(medicine.indications ?: "") }
+        var editRefillClassification by remember {
+            mutableStateOf(MedicationRefillClassification.fromKey(medicine.refillClassification))
+        }
         var editExpiryDate by remember {
             mutableLongStateOf(inventory?.expiryDate ?: (System.currentTimeMillis() + 365L * 24 * 60 * 60 * 1000))
         }
@@ -653,7 +721,10 @@ fun MedicineDetailScreen(
                 onDismissRequest = { showDatePicker = false },
                 confirmButton = {
                     TextButton(onClick = {
-                        datePickerState.selectedDateMillis?.let { editExpiryDate = it }
+                        datePickerState.selectedDateMillis?.let { pickedMillis ->
+                            val pickedLocalDate = ExpiryService.datePickerMillisToLocalDate(pickedMillis)
+                            editExpiryDate = ExpiryService.localDateToStoredExpiryMillis(pickedLocalDate)
+                        }
                         showDatePicker = false
                     }) {
                         Text(stringResource(R.string.save))
@@ -676,7 +747,8 @@ fun MedicineDetailScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth(0.92f)
-                    .fillMaxHeight(0.85f),
+                    .fillMaxHeight(0.88f)
+                    .imePadding(),
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
@@ -754,6 +826,37 @@ fun MedicineDetailScreen(
                                     )
                                 }
                             }
+                        }
+
+                        // Medication Refill Classification Checkboxes (Section 4.1)
+                        Text(
+                            text = stringResource(R.string.med_classification_title),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { editRefillClassification = MedicationRefillClassification.ONGOING_REFILL },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = editRefillClassification == MedicationRefillClassification.ONGOING_REFILL,
+                                onCheckedChange = { editRefillClassification = MedicationRefillClassification.ONGOING_REFILL }
+                            )
+                            Text(stringResource(R.string.classification_ongoing_refill), fontSize = 13.sp)
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { editRefillClassification = MedicationRefillClassification.ONE_TIME },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = editRefillClassification == MedicationRefillClassification.ONE_TIME,
+                                onCheckedChange = { editRefillClassification = MedicationRefillClassification.ONE_TIME }
+                            )
+                            Text(stringResource(R.string.classification_one_time), fontSize = 13.sp)
                         }
 
                         // Quantity
@@ -839,9 +942,10 @@ fun MedicineDetailScreen(
                                         scientificName = editScientificName.trim().takeIf { it.isNotBlank() },
                                         strength = editStrength.trim().takeIf { it.isNotBlank() },
                                         form = editForm,
-                                        indications = editIndications.trim().takeIf { it.isNotBlank() }
+                                        indications = editIndications.trim().takeIf { it.isNotBlank() },
+                                        refillClassification = editRefillClassification.key
                                     )
-                                    val parsedQty = editQuantity.toDoubleOrNull() ?: inventory?.quantity ?: 1.0
+                                    val parsedQty = (editQuantity.toDoubleOrNull() ?: inventory?.quantity ?: 1.0).coerceAtLeast(0.0)
                                     val updatedInv = inventory?.copy(
                                         quantity = parsedQty,
                                         expiryDate = editExpiryDate,
@@ -924,3 +1028,30 @@ fun getLocalizedStorageLocation(location: String?, context: Context): String {
         else -> location
     }
 }
+
+fun getLocalizedRoute(route: String?, context: Context): String {
+    if (route.isNullOrBlank()) return ""
+    val r = route.lowercase().trim()
+    return when {
+        r == "oral" || r.contains("فم") || r.contains("orale") -> context.getString(R.string.sched_route_oral)
+        r == "topical" || r.contains("موضعي") || r.contains("topique") || r.contains("topisch") -> context.getString(R.string.sched_route_topical)
+        r == "inhalation" || r.contains("استنشاق") -> context.getString(R.string.sched_route_inhalation)
+        r == "injection" || r.contains("حقن") || r.contains("injektion") -> context.getString(R.string.sched_route_injection)
+        r == "drops (eye/ear/nasal)" || r.contains("eye/ear/nasal") -> context.getString(R.string.route_drops_eye_ear_nasal)
+        r == "drops" || r.contains("قطر") || r.contains("goutte") || r.contains("tropf") -> context.getString(R.string.sched_route_Auto_drops)
+        r == "sublingual" || r.contains("تحت اللسان") -> context.getString(R.string.route_sublingual)
+        r == "nasal" || r.contains("أنف") || r.contains("nasale") -> context.getString(R.string.route_nasal)
+        r == "ophthalmic" || r.contains("عين") || r.contains("ophtalm") || r.contains("ophthalm") -> context.getString(R.string.route_ophthalmic)
+        r == "otic" || r.contains("أذن") || r.contains("auricul") || r.contains("otisch") -> context.getString(R.string.route_otic)
+        r == "other" || r.contains("أخرى") || r.contains("autre") || r.contains("sonstig") -> context.getString(R.string.route_other)
+        else -> route
+    }
+}
+
+fun getLocalizedClassificationLabel(classification: MedicationRefillClassification, context: Context): String {
+    return when (classification) {
+        MedicationRefillClassification.ONGOING_REFILL -> context.getString(R.string.classification_ongoing_refill)
+        MedicationRefillClassification.ONE_TIME -> context.getString(R.string.classification_one_time)
+    }
+}
+

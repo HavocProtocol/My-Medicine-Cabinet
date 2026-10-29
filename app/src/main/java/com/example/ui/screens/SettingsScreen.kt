@@ -1,29 +1,32 @@
 package com.example.ui.screens
 
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
-import androidx.compose.ui.draw.clip
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -40,12 +43,17 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     onBack: () -> Unit,
     onNavigateToTutorial: () -> Unit,
+    onNavigateToPremium: () -> Unit = {},
+    onNavigateToHelpCenter: () -> Unit = {},
     viewModel: AppViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val syncStatus by viewModel.syncStatus.collectAsState()
     val coroutineScope = rememberCoroutineScope()
+    val syncStatus by viewModel.syncStatus.collectAsState()
+    val warningDays by viewModel.expiryWarningDays.collectAsState()
+    val isPremium by viewModel.isPremiumSubscribed.collectAsState()
 
+    var warningDaysInput by remember(warningDays) { mutableStateOf(warningDays.toString()) }
     var languageExpanded by remember { mutableStateOf(false) }
     var themeExpanded by remember { mutableStateOf(false) }
 
@@ -54,9 +62,10 @@ fun SettingsScreen(
 
     var hostUrl by remember { mutableStateOf(LocalLlmConfig.getHostUrl(context)) }
     var modelName by remember { mutableStateOf(LocalLlmConfig.getModelName(context)) }
-    var testResult by remember { mutableStateOf<String?>(null) }
-    var isTestingConnection by remember { mutableStateOf(false) }
-    val llmService = remember { LocalLlmService() }
+    var isTestingLlmConnection by remember { mutableStateOf(false) }
+    var llmConnectionStatusMessage by remember { mutableStateOf<String?>(null) }
+    var llmConnectionSucceeded by remember { mutableStateOf<Boolean?>(null) }
+    val localLlmService = remember { LocalLlmService() }
 
     val appCompatLocales = AppCompatDelegate.getApplicationLocales().toLanguageTags()
     val currentLocale = if (appCompatLocales.isNotEmpty()) appCompatLocales else context.resources.configuration.locales[0].language
@@ -99,13 +108,108 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // 1. Near-Expiration Warning Period Configuration Card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("settings_expiry_warning_days_card"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.AccessTime,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(34.dp)
+                        )
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.settings_warning_period_title),
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            )
+                            Text(
+                                text = stringResource(R.string.settings_warning_period_desc, warningDays),
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                )
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(3, 7, 14, 30).forEach { preset ->
+                            FilterChip(
+                                selected = warningDays == preset,
+                                onClick = {
+                                    warningDaysInput = preset.toString()
+                                    viewModel.setExpiryWarningDays(preset)
+                                },
+                                label = { Text(stringResource(R.string.settings_preset_days, preset)) },
+                                modifier = Modifier.testTag("expiry_warning_preset_$preset")
+                            )
+                        }
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = warningDaysInput,
+                            onValueChange = { txt ->
+                                if (txt.all { it.isDigit() }) {
+                                    warningDaysInput = txt
+                                    txt.toIntOrNull()?.takeIf { it in 1..365 }?.let { validDays ->
+                                        viewModel.setExpiryWarningDays(validDays)
+                                    }
+                                }
+                            },
+                            label = { Text(stringResource(R.string.settings_warning_days_input_label)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("settings_expiry_warning_days_input")
+                        )
+                        Button(
+                            onClick = {
+                                val parsed = warningDaysInput.toIntOrNull()?.coerceIn(1, 365) ?: 7
+                                warningDaysInput = parsed.toString()
+                                viewModel.setExpiryWarningDays(parsed)
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.testTag("save_expiry_warning_days_button")
+                        ) {
+                            Text(stringResource(R.string.save))
+                        }
+                    }
+                }
+            }
+
             // Theme Mode Card
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("settings_theme_mode_card"),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
@@ -130,7 +234,8 @@ fun SettingsScreen(
                                 themeLabel,
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                                )
+                                ),
+                                modifier = Modifier.testTag("settings_current_theme_label")
                             )
                         }
                     }
@@ -139,7 +244,9 @@ fun SettingsScreen(
                         Button(
                             shape = RoundedCornerShape(12.dp),
                             onClick = { themeExpanded = true },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("settings_theme_dropdown_button"),
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                         ) {
                             Text(
@@ -155,23 +262,29 @@ fun SettingsScreen(
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.theme_system)) },
                                 onClick = {
+                                    LocalLlmConfig.setThemeMode(context, 0)
                                     onThemeChanged(0)
                                     themeExpanded = false
-                                }
+                                },
+                                modifier = Modifier.testTag("settings_theme_option_system")
                             )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.theme_light)) },
                                 onClick = {
+                                    LocalLlmConfig.setThemeMode(context, 1)
                                     onThemeChanged(1)
                                     themeExpanded = false
-                                }
+                                },
+                                modifier = Modifier.testTag("settings_theme_option_light")
                             )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.theme_dark)) },
                                 onClick = {
+                                    LocalLlmConfig.setThemeMode(context, 2)
                                     onThemeChanged(2)
                                     themeExpanded = false
-                                }
+                                },
+                                modifier = Modifier.testTag("settings_theme_option_dark")
                             )
                         }
                     }
@@ -248,21 +361,24 @@ fun SettingsScreen(
                 }
             }
 
-            // Local LLM Configuration Card (Greyed out & Unavailable)
-            val unavailableMsg = stringResource(R.string.feature_unavailable)
+            // Local LLM Configuration Card (Governed by Unified Premium Entitlement)
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable {
-                        Toast.makeText(context, unavailableMsg, Toast.LENGTH_SHORT).show()
-                    },
+                    .testTag("settings_local_llm_card"),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                    containerColor = if (isPremium)
+                        MaterialTheme.colorScheme.surfaceVariant
+                    else
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
                 ),
-                border = androidx.compose.foundation.BorderStroke(
+                border = BorderStroke(
                     1.dp,
-                    MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+                    if (isPremium)
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                    else
+                        Color(0xFFF59E0B).copy(alpha = 0.6f)
                 )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -278,7 +394,7 @@ fun SettingsScreen(
                             Icon(
                                 Icons.Outlined.Dns,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                tint = if (isPremium) MaterialTheme.colorScheme.primary else Color(0xFFD97706),
                                 modifier = Modifier.size(34.dp)
                             )
                             Spacer(modifier = Modifier.width(14.dp))
@@ -287,13 +403,13 @@ fun SettingsScreen(
                                     stringResource(R.string.local_llm_settings),
                                     style = MaterialTheme.typography.titleMedium.copy(
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 )
                                 Text(
                                     stringResource(R.string.local_llm_desc),
                                     style = MaterialTheme.typography.bodySmall.copy(
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                                     )
                                 )
                             }
@@ -304,14 +420,15 @@ fun SettingsScreen(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                                .background(if (isPremium) Color(0xFFDCFCE7) else Color(0xFFFEF3C7))
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
+                                .testTag("settings_local_llm_entitlement_badge")
                         ) {
                             Text(
-                                text = unavailableMsg,
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-                                fontWeight = FontWeight.Medium
+                                text = if (isPremium) stringResource(R.string.badge_included_in_premium) else stringResource(R.string.badge_premium),
+                                fontSize = 10.sp,
+                                color = if (isPremium) Color(0xFF166534) else Color(0xFFB45309),
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
@@ -320,60 +437,116 @@ fun SettingsScreen(
 
                     OutlinedTextField(
                         value = hostUrl,
-                        onValueChange = {},
-                        enabled = false,
-                        readOnly = true,
+                        onValueChange = {
+                            hostUrl = it
+                            LocalLlmConfig.saveConfig(context, hostUrl, modelName)
+                        },
+                        enabled = isPremium,
                         label = { Text(stringResource(R.string.local_llm_host)) },
                         placeholder = { Text("http://10.0.2.2:11434") },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
-                                Toast.makeText(context, unavailableMsg, Toast.LENGTH_SHORT).show()
-                            },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            disabledTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
-                            disabledContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
-                            disabledBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                            disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
-                        )
+                            .testTag("settings_local_llm_host_input"),
+                        shape = RoundedCornerShape(12.dp)
                     )
                     Spacer(modifier = Modifier.height(10.dp))
 
                     OutlinedTextField(
                         value = modelName,
-                        onValueChange = {},
-                        enabled = false,
-                        readOnly = true,
+                        onValueChange = {
+                            modelName = it
+                            LocalLlmConfig.saveConfig(context, hostUrl, modelName)
+                        },
+                        enabled = isPremium,
                         label = { Text(stringResource(R.string.local_llm_model)) },
                         placeholder = { Text("llama3") },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
-                                Toast.makeText(context, unavailableMsg, Toast.LENGTH_SHORT).show()
-                            },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            disabledTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
-                            disabledContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
-                            disabledBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                            disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
-                        )
+                            .testTag("settings_local_llm_model_input"),
+                        shape = RoundedCornerShape(12.dp)
                     )
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    Button(
-                        shape = RoundedCornerShape(12.dp),
-                        onClick = {
-                            Toast.makeText(context, unavailableMsg, Toast.LENGTH_SHORT).show()
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f),
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                    if (isPremium) {
+                        Button(
+                            shape = RoundedCornerShape(12.dp),
+                            onClick = {
+                                LocalLlmConfig.saveConfig(context, hostUrl, modelName)
+                                isTestingLlmConnection = true
+                                llmConnectionStatusMessage = null
+                                coroutineScope.launch {
+                                    val connected = localLlmService.checkConnection(hostUrl)
+                                    llmConnectionSucceeded = connected
+                                    llmConnectionStatusMessage = if (connected) {
+                                        context.getString(R.string.connection_success)
+                                    } else {
+                                        context.getString(R.string.connection_failed)
+                                    }
+                                    isTestingLlmConnection = false
+                                }
+                            },
+                            enabled = !isTestingLlmConnection,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("settings_local_llm_test_button"),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            if (isTestingLlmConnection) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                            Text(
+                                stringResource(R.string.test_connection),
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+
+                        if (!llmConnectionStatusMessage.isNullOrBlank()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = llmConnectionStatusMessage ?: "",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = if (llmConnectionSucceeded == true) Color(0xFF15803D) else MaterialTheme.colorScheme.error,
+                                modifier = Modifier.testTag("settings_local_llm_status_text")
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = stringResource(R.string.settings_local_llm_included_notice),
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    ) {
-                        Text(stringResource(R.string.test_connection))
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(
+                            shape = RoundedCornerShape(12.dp),
+                            onClick = onNavigateToPremium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("settings_local_llm_upgrade_button"),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFD97706)
+                            )
+                        ) {
+                            Icon(
+                                Icons.Default.WorkspacePremium,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.settings_upgrade_unlock_llm_btn),
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }

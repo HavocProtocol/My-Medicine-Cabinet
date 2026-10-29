@@ -5,8 +5,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -19,12 +21,15 @@ import java.net.URLDecoder
 import java.net.URLEncoder
 
 @Composable
-fun AppNavigation() {
-    val navController = rememberNavController()
+fun AppNavigation(
+    navController: NavHostController = rememberNavController()
+) {
     val context = LocalContext.current
-    val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-    val isOnboardingComplete = prefs.getBoolean("onboarding_complete", false)
-    val startDest = if (isOnboardingComplete) "home" else "onboarding"
+    val startDest = rememberSaveable {
+        val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+        val isOnboardingComplete = prefs.getBoolean("onboarding_complete", false)
+        if (isOnboardingComplete) "home" else "onboarding"
+    }
 
     // Shared in-memory draft passed from BoxScanScreen -> AddMedicineScreen
     var pendingBoxDraft by remember { mutableStateOf<MedicineDraft?>(null) }
@@ -32,6 +37,7 @@ fun AppNavigation() {
     NavHost(navController = navController, startDestination = startDest) {
         composable("onboarding") {
             OnboardingScreen(onFinish = {
+                val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
                 prefs.edit().putBoolean("onboarding_complete", true).apply()
                 navController.navigate("home") {
                     popUpTo("onboarding") { inclusive = true }
@@ -51,7 +57,6 @@ fun AppNavigation() {
                     navController.navigate("medication_schedule")
                 },
                 onStatCardClick = { filter -> navController.navigate("medicine_list/$filter") },
-                onScan = { navController.navigate("scan") },
                 onCategories = { navController.navigate("categories") },
                 onPrint = { navController.navigate("print") },
                 onSettings = { navController.navigate("settings") },
@@ -59,6 +64,48 @@ fun AppNavigation() {
                 onAISearch = { navController.navigate("aisearch") },
                 onVoice = { navController.navigate("voice") },
                 onTutorial = { navController.navigate("tutorial") },
+                onNavigateToPremium = { navController.navigate("premium_subscription") },
+                onNavigateToHelpCenter = { navController.navigate("help_center") },
+                onMedicineClick = { id -> navController.navigate("medicine_detail/$id") },
+                onRefillNeeded = { navController.navigate("refill_needed") },
+                onOneTimeMedications = { navController.navigate("one_time_medications") }
+            )
+        }
+        composable("premium_subscription") {
+            PremiumSubscriptionScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToVoiceSearch = { navController.navigate("voice") },
+                onNavigateToAISearch = { navController.navigate("aisearch") },
+                onNavigateToHelpCenter = { navController.navigate("help_center") },
+                onNavigateToSettings = { navController.navigate("settings") }
+            )
+        }
+        composable("help_center") {
+            HelpCenterScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToPremiumSubscription = { navController.navigate("premium_subscription") },
+                onNavigateToLiveChat = { navController.navigate("live_chat") }
+            )
+        }
+        composable("live_chat") {
+            LiveChatScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToPremiumSubscription = {
+                    navController.navigate("premium_subscription") {
+                        popUpTo("live_chat") { inclusive = true }
+                    }
+                }
+            )
+        }
+        composable("refill_needed") {
+            RefillNeededScreen(
+                onBack = { navController.popBackStack() },
+                onMedicineClick = { id -> navController.navigate("medicine_detail/$id") }
+            )
+        }
+        composable("one_time_medications") {
+            OneTimeMedicationsScreen(
+                onBack = { navController.popBackStack() },
                 onMedicineClick = { id -> navController.navigate("medicine_detail/$id") }
             )
         }
@@ -92,13 +139,8 @@ fun AppNavigation() {
             )
         }
         composable(
-            route = "add_medicine?barcode={barcode}&name={name}&manufacturer={manufacturer}",
+            route = "add_medicine?name={name}&manufacturer={manufacturer}",
             arguments = listOf(
-                navArgument("barcode") {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                },
                 navArgument("name") {
                     type = NavType.StringType
                     nullable = true
@@ -111,7 +153,6 @@ fun AppNavigation() {
                 }
             )
         ) { backStackEntry ->
-            val barcode = backStackEntry.arguments?.getString("barcode")
             val name = backStackEntry.arguments?.getString("name")?.let {
                 try { URLDecoder.decode(it, "UTF-8") } catch (_: Exception) { it }
             }
@@ -120,7 +161,6 @@ fun AppNavigation() {
             }
 
             AddMedicineScreen(
-                initialBarcode = barcode,
                 initialTradeName = name,
                 initialManufacturer = manufacturer,
                 prefillDraft = pendingBoxDraft,
@@ -174,7 +214,8 @@ fun AppNavigation() {
             MedInfoScreen(
                 medicineName = name,
                 scientificName = sci,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onNavigateToPremium = { navController.navigate("premium_subscription") }
             )
         }
         composable("medicine_list/{filter}") { backStackEntry ->
@@ -192,32 +233,28 @@ fun AppNavigation() {
         composable("settings") {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
-                onNavigateToTutorial = { navController.navigate("tutorial") }
+                onNavigateToTutorial = { navController.navigate("tutorial") },
+                onNavigateToPremium = { navController.navigate("premium_subscription") },
+                onNavigateToHelpCenter = { navController.navigate("help_center") }
             )
         }
         composable("tutorial") {
             TutorialScreen(onBack = { navController.popBackStack() })
         }
-        composable("scan") {
-            ScanScreen(
-                onBack = { navController.popBackStack() },
-                onBarcodeScanned = { barcode, name, manufacturer ->
-                    val encodedName = URLEncoder.encode(name, "UTF-8")
-                    val encodedMan = URLEncoder.encode(manufacturer, "UTF-8")
-                    navController.navigate("add_medicine?barcode=$barcode&name=$encodedName&manufacturer=$encodedMan") {
-                        popUpTo("home")
-                    }
-                }
-            )
-        }
         composable("print") {
             PrintScreen(onBack = { navController.popBackStack() })
         }
         composable("aisearch") {
-            AISearchScreen(onBack = { navController.popBackStack() })
+            AISearchScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToPremium = { navController.navigate("premium_subscription") }
+            )
         }
         composable("voice") {
-            VoiceScreen(onBack = { navController.popBackStack() })
+            VoiceScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToPremium = { navController.navigate("premium_subscription") }
+            )
         }
         composable("categories") {
             CategoriesScreen(onBack = { navController.popBackStack() })

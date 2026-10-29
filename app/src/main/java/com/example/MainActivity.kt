@@ -11,8 +11,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.navigation.compose.rememberNavController
 import com.example.services.LocalLlmConfig
 import com.example.ui.AppNavigation
 import com.example.ui.theme.MyApplicationTheme
@@ -44,18 +46,22 @@ class MainActivity : AppCompatActivity() {
         }
 
         setContent {
-            var themeMode by remember { mutableIntStateOf(LocalLlmConfig.getThemeMode(this)) }
+            val navController = rememberNavController()
+            var themeMode by rememberSaveable { mutableIntStateOf(LocalLlmConfig.getThemeMode(this)) }
+            val onThemeChanged = remember {
+                { newMode: Int ->
+                    themeMode = newMode
+                    LocalLlmConfig.setThemeMode(this@MainActivity, newMode)
+                }
+            }
 
             MyApplicationTheme(
                 themeMode = themeMode,
-                onThemeChanged = { newMode ->
-                    themeMode = newMode
-                    LocalLlmConfig.setThemeMode(this, newMode)
-                }
+                onThemeChanged = onThemeChanged
             ) {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Box(modifier = Modifier.padding(innerPadding)) {
-                        AppNavigation()
+                        AppNavigation(navController = navController)
                     }
                 }
             }

@@ -155,7 +155,8 @@ data class InventorySufficiencyInfo(
     val upcoming7DayRequired: Double,
     val lowStockThreshold: Double,
     val isLowStock: Boolean,
-    val isInsufficientForUpcoming: Boolean
+    val isInsufficientForUpcoming: Boolean,
+    val unitMismatchWarning: String? = null
 )
 
 data class DayScheduleSummary(

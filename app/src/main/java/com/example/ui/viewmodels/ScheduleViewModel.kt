@@ -80,14 +80,26 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
     val inventorySufficiency: StateFlow<List<InventorySufficiencyInfo>> = combine(
         schedules,
         allInventoryItems,
-        _todayDateIso
-    ) { scheds, invItems, todayIso ->
+        _todayDateIso,
+        allDoseRecords
+    ) { scheds, invItems, todayIso, doseRecords ->
         MedicationScheduleEngine.evaluateInventorySufficiency(
             schedules = scheds,
             inventoryItems = invItems,
             startDateIso = todayIso,
-            daysAhead = 7
+            daysAhead = 7,
+            existingDoseRecords = doseRecords
         )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /**
+     * Completed dose history records only (status == TAKEN and actualTakenTimestampMillis != null, excluding future/pending doses).
+     */
+    val completedHistoryRecords: StateFlow<List<DoseRecord>> = combine(
+        allDoseRecords,
+        _todayDateIso
+    ) { records, _ ->
+        MedicationScheduleEngine.filterCompletedHistoryDoses(records, System.currentTimeMillis())
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val daySummariesByDate: StateFlow<Map<String, DayScheduleSummary>> = allDoseRecords
@@ -167,15 +179,19 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         val invItems = allInventoryItems.value.filter { it.medicineId == medicineId }
         val latestExpiry = overrideExpiryMillis
             ?: invItems.maxByOrNull { it.expiryDate }?.expiryDate
+        val warningDays = com.example.services.LocalLlmConfig.getExpiryWarningDays(getApplication())
         return MedicationScheduleEngine.evaluateExpirySafety(
             medicineName = medicineName,
-            expiryDateMillis = latestExpiry
+            expiryDateMillis = latestExpiry,
+            warningDays = warningDays
         )
     }
 
     fun validateDraft(draft: ScheduleDraftInput): ScheduleValidationResult {
+        val warningDays = com.example.services.LocalLlmConfig.getExpiryWarningDays(getApplication())
         return MedicationScheduleEngine.validateScheduleDraft(
-            draft = draft.copy(userId = _currentUserId.value)
+            draft = draft.copy(userId = _currentUserId.value),
+            warningDays = warningDays
         )
     }
 

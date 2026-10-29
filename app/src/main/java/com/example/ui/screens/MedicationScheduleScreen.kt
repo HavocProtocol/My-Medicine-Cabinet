@@ -387,7 +387,9 @@ private fun TodayAndCalendarTab(
         .filter { it.status == DoseStatus.PENDING.key }
         .minByOrNull { it.scheduledTimestampMillis }
 
-    val lowStockWarnings = inventorySufficiency.filter { it.isInsufficientForUpcoming || it.isLowStock }
+    val lowStockWarnings = inventorySufficiency.filter {
+        it.isInsufficientForUpcoming || it.unitMismatchWarning != null
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -563,14 +565,15 @@ private fun TodayAndCalendarTab(
                             )
                         }
                         lowStockWarnings.forEach { info ->
+                            val warningLine = info.unitMismatchWarning ?: stringResource(
+                                R.string.sched_low_stock_banner_body,
+                                info.medicineName,
+                                formatAmount(info.recordedQuantity ?: 0.0),
+                                info.unit,
+                                formatAmount(info.upcoming7DayRequired)
+                            )
                             Text(
-                                text = stringResource(
-                                    R.string.sched_low_stock_banner_body,
-                                    info.medicineName,
-                                    formatAmount(info.recordedQuantity ?: 0.0),
-                                    info.unit,
-                                    formatAmount(info.upcoming7DayRequired)
-                                ),
+                                text = warningLine,
                                 fontSize = 12.sp,
                                 color = Color(0xFF92400E)
                             )
@@ -870,7 +873,7 @@ private fun DoseOccurrenceCard(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "${formatAmount(dose.configuredDosage)} ${dose.dosageUnit}",
+                            text = "${formatAmount(dose.configuredDosage)} ${getLocalizedUnit(dose.dosageUnit, LocalContext.current)}",
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1035,8 +1038,11 @@ private fun RoutinesTab(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp
                             )
+                            val ctx = LocalContext.current
+                            val localForm = sched.formulation?.let { getLocalizedForm(it, ctx) } ?: ""
+                            val localRoute = sched.routeOfAdministration?.let { getLocalizedRoute(it, ctx) } ?: ""
                             Text(
-                                text = "${sched.formulation ?: ""} • ${sched.routeOfAdministration ?: ""}",
+                                text = listOf(localForm, localRoute).filter { it.isNotBlank() }.joinToString(" • "),
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1166,19 +1172,23 @@ private fun HistoryTab(
     var dateFilter by remember { mutableStateOf("ALL") }
     var selectedMedicineFilter by remember { mutableStateOf<String?>(null) }
 
-    val distinctMedicines = remember(allDoseRecords) {
-        allDoseRecords.map { it.medicineName }.distinct().sorted()
+    val completedDoseRecords = remember(allDoseRecords) {
+        MedicationScheduleEngine.filterCompletedHistoryDoses(allDoseRecords)
     }
 
-    val filteredRecords = remember(allDoseRecords, dateFilter, selectedMedicineFilter, todayIso) {
+    val distinctMedicines = remember(completedDoseRecords) {
+        completedDoseRecords.map { it.medicineName }.distinct().sorted()
+    }
+
+    val filteredRecords = remember(completedDoseRecords, dateFilter, selectedMedicineFilter, todayIso) {
         val minDateIso = when (dateFilter) {
             "TODAY" -> todayIso
             "7DAYS" -> MedicationScheduleEngine.addDaysToIso(todayIso, -7)
             "30DAYS" -> MedicationScheduleEngine.addDaysToIso(todayIso, -30)
             else -> null
         }
-        allDoseRecords.filter { rec ->
-            val dateMatches = minDateIso == null || rec.scheduledDateIso >= minDateIso
+        completedDoseRecords.filter { rec ->
+            val dateMatches = minDateIso == null || (rec.scheduledDateIso >= minDateIso && rec.scheduledDateIso <= todayIso)
             val medMatches = selectedMedicineFilter == null || rec.medicineName == selectedMedicineFilter
             dateMatches && medMatches
         }
@@ -1304,7 +1314,7 @@ private fun HistoryTab(
                                     fontSize = 15.sp
                                 )
                                 Text(
-                                    text = "${rec.scheduledDateIso} • ${rec.scheduledTimeHm} • ${formatAmount(rec.configuredDosage)} ${rec.dosageUnit}",
+                                    text = "${rec.scheduledDateIso} • ${rec.scheduledTimeHm} • ${formatAmount(rec.configuredDosage)} ${getLocalizedUnit(rec.dosageUnit, LocalContext.current)}",
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

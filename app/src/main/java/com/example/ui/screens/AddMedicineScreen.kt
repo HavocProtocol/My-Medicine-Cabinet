@@ -1,16 +1,19 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.DocumentScanner
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,28 +21,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.R
 import com.example.boxscan.models.MedForm
 import com.example.boxscan.models.MedicineDraft
 import com.example.boxscan.ui.BoxScanScreen
+import com.example.data.MedicationRefillClassification
 import com.example.safety.ExpiryService
-import com.example.safety.ExpiryStatus
-import com.example.safety.SafetyStrings
+import com.example.safety.MedicineExpirationStatus
 import com.example.ui.utils.getLocalizedName
 import com.example.ui.viewmodels.AppViewModel
-import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AddMedicineScreen(
-    initialBarcode: String? = null,
     initialTradeName: String? = null,
     initialManufacturer: String? = null,
     prefillDraft: MedicineDraft? = null,
@@ -47,9 +50,11 @@ fun AddMedicineScreen(
     onBack: () -> Unit = {},
     viewModel: AppViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     // Allow launching BoxScanScreen directly from AddMedicineScreen as well as receiving prefillDraft from route
     var showInlineBoxScanner by remember { mutableStateOf(false) }
     var activeDraft by remember(prefillDraft) { mutableStateOf(prefillDraft) }
+    val warningDays by viewModel.expiryWarningDays.collectAsState()
 
     val formTablets = stringResource(R.string.form_tablets)
     val formCapsules = stringResource(R.string.form_capsules)
@@ -80,40 +85,83 @@ fun AddMedicineScreen(
     var form by remember { mutableStateOf("") }
     var quantity by remember { mutableStateOf("1") }
     var manufacturer by remember { mutableStateOf(initialManufacturer ?: "") }
-    var barcode by remember { mutableStateOf(initialBarcode ?: "") }
     var batchNumber by remember { mutableStateOf("") }
     var storageLocation by remember { mutableStateOf("") }
     var needsRefrigeration by remember { mutableStateOf(false) }
-    var usageMode by remember { mutableStateOf("") }
     var indications by remember { mutableStateOf("") }
     var userNotes by remember { mutableStateOf("") }
+
+    // Section 4.1: Medication Refill Classification (mutually exclusive checkboxes)
+    var refillClassification by remember {
+        mutableStateOf(MedicationRefillClassification.ONE_TIME)
+    }
+
+    // Section 6.1: Prescribed Dosage & Administration Route dropdowns
+    val dosageAmountOptions = remember {
+        listOf("0.5", "1", "1.5", "2", "2.5", "5", "10", "15", "20", "Other")
+    }
+    var selectedDosageOption by remember { mutableStateOf("1") }
+    var customDosageAmount by remember { mutableStateOf("") }
+    var dosageDropdownExpanded by remember { mutableStateOf(false) }
+
+    val administrationRouteOptions = listOf(
+        "Oral" to stringResource(R.string.sched_route_oral),
+        "Topical" to stringResource(R.string.sched_route_topical),
+        "Inhalation" to stringResource(R.string.sched_route_inhalation),
+        "Injection" to stringResource(R.string.sched_route_injection),
+        "Drops (Eye/Ear/Nasal)" to stringResource(R.string.route_drops_eye_ear_nasal),
+        "Sublingual" to stringResource(R.string.route_sublingual),
+        "Nasal" to stringResource(R.string.route_nasal),
+        "Ophthalmic" to stringResource(R.string.route_ophthalmic),
+        "Otic" to stringResource(R.string.route_otic),
+        "Other" to stringResource(R.string.route_other)
+    )
+    var selectedRouteOption by remember { mutableStateOf("Oral") }
+    var customRouteText by remember { mutableStateOf("") }
+    var routeDropdownExpanded by remember { mutableStateOf(false) }
 
     // Track whether fields were prefilled from OCR and whether OCR expiry has been explicitly confirmed
     var isOcrPrefilled by remember { mutableStateOf(false) }
     var ocrExpiryConfirmed by remember { mutableStateOf(true) }
+    var submissionErrorMessage by remember { mutableStateOf<String?>(null) }
 
     val allCategories by viewModel.allCategories.collectAsState()
     var selectedCategories by remember { mutableStateOf(setOf<Int>()) }
     var formExpanded by remember { mutableStateOf(false) }
 
     var showDatePicker by remember { mutableStateOf(false) }
-    val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = System.currentTimeMillis() + 365L * 24 * 60 * 60 * 1000
-    )
-    val dateFormatter = remember {
-        java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
-    }
-    val selectedDateString = datePickerState.selectedDateMillis?.let {
-        dateFormatter.format(java.util.Date(it))
-    } ?: ""
+    val defaultFutureLocalDate = remember { LocalDate.now().plusYears(1) }
+    val futureOnlySelectableDates = remember {
+        object : SelectableDates {
+            override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                val candidateDate = ExpiryService.datePickerMillisToLocalDate(utcTimeMillis)
+                return ExpiryService.isValidNewMedicineExpiryDate(LocalDate.now(), candidateDate)
+            }
 
-    // Compute whether the currently selected expiry date is already in the past
-    val isSelectedExpiryPast = remember(datePickerState.selectedDateMillis) {
-        val millis = datePickerState.selectedDateMillis ?: return@remember false
-        val selectedLocalDate = Instant.ofEpochMilli(millis)
-            .atZone(ZoneId.systemDefault())
-            .toLocalDate()
-        ExpiryService.classify(LocalDate.now(), selectedLocalDate) == ExpiryStatus.EXPIRED
+            override fun isSelectableYear(year: Int): Boolean {
+                return year >= LocalDate.now().year
+            }
+        }
+    }
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = ExpiryService.localDateToDatePickerMillis(defaultFutureLocalDate),
+        selectableDates = futureOnlySelectableDates
+    )
+
+    val selectedLocalDate: LocalDate? = remember(datePickerState.selectedDateMillis) {
+        datePickerState.selectedDateMillis?.let { ExpiryService.datePickerMillisToLocalDate(it) }
+    }
+    val selectedDateString = selectedLocalDate?.toString() ?: ""
+
+    // Section 2: Strict future expiry validation (must be strictly later than today's local date)
+    val isExpiryDateInvalid = remember(selectedLocalDate) {
+        val date = selectedLocalDate ?: return@remember true
+        !ExpiryService.isValidNewMedicineExpiryDate(LocalDate.now(), date)
+    }
+
+    val computedExpirationStatus = remember(selectedLocalDate, warningDays) {
+        val date = selectedLocalDate ?: return@remember MedicineExpirationStatus.EXPIRED
+        ExpiryService.evaluateExpirationStatus(LocalDate.now(), date, warningDays)
     }
 
     LaunchedEffect(defaultForm) {
@@ -157,11 +205,7 @@ fun AddMedicineScreen(
         if (!draft.expiryDate.isNullOrBlank()) {
             runCatching {
                 val parsedDate = LocalDate.parse(draft.expiryDate.trim())
-                val epochMillis = parsedDate
-                    .atStartOfDay(java.time.ZoneOffset.UTC)
-                    .toInstant()
-                    .toEpochMilli()
-                datePickerState.selectedDateMillis = epochMillis
+                datePickerState.selectedDateMillis = ExpiryService.localDateToDatePickerMillis(parsedDate)
             }
             ocrExpiryConfirmed = draft.expiryExplicitlyConfirmed
         } else {
@@ -195,6 +239,23 @@ fun AddMedicineScreen(
         focusedBorderColor = MaterialTheme.colorScheme.primary,
         unfocusedBorderColor = Color.Transparent
     )
+
+    val effectiveDosageValue = if (selectedDosageOption == "Other") {
+        customDosageAmount.trim()
+    } else {
+        selectedDosageOption
+    }
+    val isDosageValid = effectiveDosageValue.toDoubleOrNull()?.let { it > 0.0 } == true
+
+    val effectiveRouteValue = if (selectedRouteOption == "Other") {
+        customRouteText.trim()
+    } else {
+        selectedRouteOption
+    }
+    val isRouteValid = effectiveRouteValue.isNotBlank()
+
+    val parsedQuantity = quantity.toDoubleOrNull()
+    val isQuantityValid = parsedQuantity != null && parsedQuantity >= 0.0
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -237,11 +298,12 @@ fun AddMedicineScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Prominent "مسح علبة الدواء" (Scan medicine box) banner card
+            // Prominent Scan medicine box banner card
             Card(
                 onClick = { showInlineBoxScanner = true },
                 shape = RoundedCornerShape(16.dp),
@@ -310,37 +372,7 @@ fun AddMedicineScreen(
                 }
             }
 
-            // Expired Medicine Safety Disposal Warning (Mandatory SafetyStrings.EXPIRED_DISPOSAL)
-            if (isSelectedExpiryPast) {
-                Card(
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("add_medicine_expired_warning")
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.WarningAmber,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = stringResource(R.string.expired_warning),
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    }
-                }
-            }
-
+            // Step 1: Trade Name & Expiry Date (checked first to gate remaining steps when invalid)
             OutlinedTextField(
                 shape = RoundedCornerShape(12.dp),
                 colors = textFieldColors,
@@ -351,98 +383,6 @@ fun AddMedicineScreen(
                     .fillMaxWidth()
                     .testTag("add_trade_name_input")
             )
-            OutlinedTextField(
-                shape = RoundedCornerShape(12.dp),
-                colors = textFieldColors,
-                value = scientificName,
-                onValueChange = { scientificName = it },
-                label = { Text(stringResource(R.string.scientific_name)) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("add_scientific_name_input")
-            )
-            OutlinedTextField(
-                shape = RoundedCornerShape(12.dp),
-                colors = textFieldColors,
-                value = strength,
-                onValueChange = { strength = it },
-                label = { Text(stringResource(R.string.strength)) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("add_strength_input")
-            )
-
-            ExposedDropdownMenuBox(
-                expanded = formExpanded,
-                onExpandedChange = { formExpanded = it }
-            ) {
-                OutlinedTextField(
-                    shape = RoundedCornerShape(12.dp),
-                    colors = textFieldColors,
-                    value = form,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text(stringResource(R.string.dosage_form)) },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = formExpanded) },
-                    modifier = Modifier
-                        .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                        .fillMaxWidth()
-                )
-                ExposedDropdownMenu(
-                    expanded = formExpanded,
-                    onDismissRequest = { formExpanded = false }
-                ) {
-                    forms.forEach { selectionOption ->
-                        DropdownMenuItem(
-                            text = { Text(selectionOption) },
-                            onClick = {
-                                form = selectionOption
-                                formExpanded = false
-                            }
-                        )
-                    }
-                }
-            }
-
-            OutlinedTextField(
-                shape = RoundedCornerShape(12.dp),
-                colors = textFieldColors,
-                value = quantity,
-                onValueChange = { quantity = it },
-                label = { Text(stringResource(R.string.remaining_quantity)) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("add_quantity_input")
-            )
-            OutlinedTextField(
-                shape = RoundedCornerShape(12.dp),
-                colors = textFieldColors,
-                value = manufacturer,
-                onValueChange = { manufacturer = it },
-                label = { Text(stringResource(R.string.manufacturer)) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("add_manufacturer_input")
-            )
-            OutlinedTextField(
-                shape = RoundedCornerShape(12.dp),
-                colors = textFieldColors,
-                value = batchNumber,
-                onValueChange = { batchNumber = it },
-                label = { Text(stringResource(R.string.batch_number_label)) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("add_batch_number_input")
-            )
-
-            OutlinedTextField(
-                shape = RoundedCornerShape(12.dp),
-                colors = textFieldColors,
-                value = storageLocation,
-                onValueChange = { storageLocation = it },
-                label = { Text(stringResource(R.string.storage_location)) },
-                modifier = Modifier.fillMaxWidth()
-            )
 
             OutlinedTextField(
                 shape = RoundedCornerShape(12.dp),
@@ -450,42 +390,18 @@ fun AddMedicineScreen(
                 value = selectedDateString,
                 onValueChange = {},
                 readOnly = true,
+                isError = isExpiryDateInvalid,
                 label = { Text(stringResource(R.string.expiry_date)) },
                 trailingIcon = {
                     IconButton(onClick = { showDatePicker = true }) {
-                        Icon(Icons.Default.DateRange, contentDescription = "Select Date")
+                        Icon(Icons.Default.DateRange, contentDescription = stringResource(R.string.expiry_date))
                     }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clickable { showDatePicker = true }
                     .testTag("add_expiry_date_input")
             )
-
-            // If prefilled from OCR and not yet confirmed, require explicit expiry confirmation
-            if (isOcrPrefilled && !ocrExpiryConfirmed) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xFFFEF3C7))
-                        .clickable { ocrExpiryConfirmed = true }
-                        .padding(10.dp)
-                        .testTag("add_confirm_ocr_expiry_row"),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Checkbox(
-                        checked = ocrExpiryConfirmed,
-                        onCheckedChange = { ocrExpiryConfirmed = it }
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = stringResource(R.string.box_scan_confirm_expiry_named, selectedDateString),
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF92400E)
-                    )
-                }
-            }
 
             if (showDatePicker) {
                 DatePickerDialog(
@@ -495,6 +411,7 @@ fun AddMedicineScreen(
                             onClick = {
                                 showDatePicker = false
                                 ocrExpiryConfirmed = true
+                                submissionErrorMessage = null
                             }
                         ) {
                             Text(stringResource(R.string.save))
@@ -510,89 +427,515 @@ fun AddMedicineScreen(
                 }
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(
-                    checked = needsRefrigeration,
-                    onCheckedChange = { needsRefrigeration = it }
-                )
-                Text(
-                    stringResource(R.string.needs_refrigeration),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-
-            if (allCategories.isNotEmpty()) {
-                Text(
-                    stringResource(R.string.categories),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Bold
-                )
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+            // Section 2: If the entered/selected expiry date is invalid (today or earlier),
+            // display the prominent red warning and hide all remaining Add Medicine form steps!
+            if (isExpiryDateInvalid) {
+                Card(
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFFFEE2E2)
+                    ),
+                    border = BorderStroke(1.5.dp, Color(0xFFDC2626)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("add_medicine_expired_warning")
                 ) {
-                    allCategories.forEach { category ->
-                        val isSelected = selectedCategories.contains(category.id)
-                        FilterChip(
-                            selected = isSelected,
-                            onClick = {
-                                selectedCategories = if (isSelected) {
-                                    selectedCategories - category.id
-                                } else {
-                                    selectedCategories + category.id
-                                }
-                            },
-                            label = { Text(category.getLocalizedName()) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ErrorOutline,
+                            contentDescription = null,
+                            tint = Color(0xFFB91C1C),
+                            modifier = Modifier.size(26.dp)
                         )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.invalid_expiry_entry_error),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF991B1B)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = stringResource(R.string.expired_warning),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFFB91C1C)
+                            )
+                        }
                     }
                 }
-            }
-
-            Button(
-                shape = RoundedCornerShape(12.dp),
-                enabled = tradeName.isNotBlank() && (!isOcrPrefilled || ocrExpiryConfirmed),
-                onClick = {
-                    if (tradeName.isNotBlank() && (!isOcrPrefilled || ocrExpiryConfirmed)) {
-                        viewModel.insertMedicine(
-                            tradeName = tradeName,
-                            scientificName = scientificName.takeIf { it.isNotBlank() },
-                            barcode = barcode.takeIf { it.isNotBlank() },
-                            form = form,
-                            strength = strength.takeIf { it.isNotBlank() },
-                            manufacturer = manufacturer.takeIf { it.isNotBlank() },
-                            imagePath = null,
-                            indications = indications.takeIf { it.isNotBlank() },
-                            warnings = null,
-                            quantity = quantity.toDoubleOrNull() ?: 1.0,
-                            unit = defaultUnit,
-                            purchaseDate = System.currentTimeMillis(),
-                            expiryDate = datePickerState.selectedDateMillis
-                                ?: (System.currentTimeMillis() + 365L * 24 * 60 * 60 * 1000),
-                            batchNumber = batchNumber.takeIf { it.isNotBlank() },
-                            storageLocation = storageLocation.takeIf { it.isNotBlank() },
-                            needsRefrigeration = needsRefrigeration,
-                            usageMode = usageMode,
-                            userNotes = userNotes.takeIf { it.isNotBlank() },
-                            categoryIds = selectedCategories
-                        )
-                        onSave()
+            } else {
+                // Valid future expiry date selected: if within warning period (e.g., 7 days), show Expiring Soon notice
+                if (computedExpirationStatus == MedicineExpirationStatus.EXPIRING_SOON) {
+                    val daysLeft = selectedLocalDate?.let { ExpiryService.daysUntil(LocalDate.now(), it) } ?: 1L
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF3C7)),
+                        border = BorderStroke(1.dp, Color(0xFFD97706)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("add_medicine_expiring_soon_notice")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.WarningAmber,
+                                contentDescription = null,
+                                tint = Color(0xFFB45309)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.expiring_soon_entry_warning, daysLeft, warningDays),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF92400E)
+                            )
+                        }
                     }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-                    .testTag("save_medicine_button"),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-            ) {
-                Text(stringResource(R.string.save_medicine_button), color = MaterialTheme.colorScheme.onPrimary)
+                }
+
+                // Remaining Add Medicine form steps (visible only when expiry date is strictly in the future)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("add_medicine_remaining_steps"),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    OutlinedTextField(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = textFieldColors,
+                        value = scientificName,
+                        onValueChange = { scientificName = it },
+                        label = { Text(stringResource(R.string.scientific_name)) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("add_scientific_name_input")
+                    )
+                    OutlinedTextField(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = textFieldColors,
+                        value = strength,
+                        onValueChange = { strength = it },
+                        label = { Text(stringResource(R.string.strength)) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("add_strength_input")
+                    )
+
+                    ExposedDropdownMenuBox(
+                        expanded = formExpanded,
+                        onExpandedChange = { formExpanded = it }
+                    ) {
+                        OutlinedTextField(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = textFieldColors,
+                            value = form,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text(stringResource(R.string.dosage_form)) },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = formExpanded) },
+                            modifier = Modifier
+                                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                                .fillMaxWidth()
+                                .testTag("add_form_dropdown")
+                        )
+                        ExposedDropdownMenu(
+                            expanded = formExpanded,
+                            onDismissRequest = { formExpanded = false }
+                        ) {
+                            forms.forEach { selectionOption ->
+                                DropdownMenuItem(
+                                    text = { Text(selectionOption) },
+                                    onClick = {
+                                        form = selectionOption
+                                        formExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // Section 6.1: Prescribed Dosage & Administration Route Dropdowns
+                    Text(
+                        text = stringResource(R.string.prescribed_dosage_section_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        ExposedDropdownMenuBox(
+                            expanded = dosageDropdownExpanded,
+                            onExpandedChange = { dosageDropdownExpanded = it },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            val selectedDosageDisplay = if (selectedDosageOption == "Other") {
+                                stringResource(R.string.route_other)
+                            } else {
+                                selectedDosageOption
+                            }
+                            OutlinedTextField(
+                                shape = RoundedCornerShape(12.dp),
+                                colors = textFieldColors,
+                                value = selectedDosageDisplay,
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text(stringResource(R.string.prescribed_dosage_label, defaultUnit)) },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dosageDropdownExpanded) },
+                                modifier = Modifier
+                                    .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                                    .fillMaxWidth()
+                                    .testTag("add_prescribed_dosage_dropdown")
+                            )
+                            ExposedDropdownMenu(
+                                expanded = dosageDropdownExpanded,
+                                onDismissRequest = { dosageDropdownExpanded = false }
+                            ) {
+                                dosageAmountOptions.forEach { option ->
+                                    val optionLabel = if (option == "Other") stringResource(R.string.route_other) else option
+                                    DropdownMenuItem(
+                                        text = { Text(optionLabel) },
+                                        onClick = {
+                                            selectedDosageOption = option
+                                            dosageDropdownExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        ExposedDropdownMenuBox(
+                            expanded = routeDropdownExpanded,
+                            onExpandedChange = { routeDropdownExpanded = it },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            val selectedRouteDisplay = administrationRouteOptions.find { it.first == selectedRouteOption }?.second
+                                ?: selectedRouteOption
+                            OutlinedTextField(
+                                shape = RoundedCornerShape(12.dp),
+                                colors = textFieldColors,
+                                value = selectedRouteDisplay,
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text(stringResource(R.string.administration_route_label)) },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = routeDropdownExpanded) },
+                                modifier = Modifier
+                                    .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                                    .fillMaxWidth()
+                                    .testTag("add_administration_route_dropdown")
+                            )
+                            ExposedDropdownMenu(
+                                expanded = routeDropdownExpanded,
+                                onDismissRequest = { routeDropdownExpanded = false }
+                            ) {
+                                administrationRouteOptions.forEach { (routeKey, routeLabel) ->
+                                    DropdownMenuItem(
+                                        text = { Text(routeLabel) },
+                                        onClick = {
+                                            selectedRouteOption = routeKey
+                                            routeDropdownExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (selectedDosageOption == "Other") {
+                        OutlinedTextField(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = textFieldColors,
+                            value = customDosageAmount,
+                            onValueChange = { customDosageAmount = it },
+                            label = { Text(stringResource(R.string.custom_prescribed_dosage_label, defaultUnit)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            isError = !isDosageValid,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("add_custom_dosage_input")
+                        )
+                    }
+
+                    if (selectedRouteOption == "Other") {
+                        OutlinedTextField(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = textFieldColors,
+                            value = customRouteText,
+                            onValueChange = { customRouteText = it },
+                            label = { Text(stringResource(R.string.custom_administration_route_label)) },
+                            isError = !isRouteValid,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("add_custom_route_input")
+                        )
+                    }
+
+                    // Section 4.1: Medication Refill Classification Checkboxes
+                    Card(
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                        ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("add_refill_classification_section")
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = stringResource(R.string.med_classification_title),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable {
+                                        refillClassification = MedicationRefillClassification.ONGOING_REFILL
+                                    }
+                                    .padding(vertical = 4.dp)
+                                    .testTag("checkbox_ongoing_refill"),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = refillClassification == MedicationRefillClassification.ONGOING_REFILL,
+                                    onCheckedChange = {
+                                        refillClassification = MedicationRefillClassification.ONGOING_REFILL
+                                    }
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = stringResource(R.string.classification_ongoing_refill),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable {
+                                        refillClassification = MedicationRefillClassification.ONE_TIME
+                                    }
+                                    .padding(vertical = 4.dp)
+                                    .testTag("checkbox_one_time"),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = refillClassification == MedicationRefillClassification.ONE_TIME,
+                                    onCheckedChange = {
+                                        refillClassification = MedicationRefillClassification.ONE_TIME
+                                    }
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = stringResource(R.string.classification_one_time),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+
+                    OutlinedTextField(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = textFieldColors,
+                        value = quantity,
+                        onValueChange = { quantity = it },
+                        label = { Text(stringResource(R.string.remaining_quantity)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        isError = !isQuantityValid,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("add_quantity_input")
+                    )
+                    OutlinedTextField(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = textFieldColors,
+                        value = manufacturer,
+                        onValueChange = { manufacturer = it },
+                        label = { Text(stringResource(R.string.manufacturer)) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("add_manufacturer_input")
+                    )
+                    OutlinedTextField(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = textFieldColors,
+                        value = batchNumber,
+                        onValueChange = { batchNumber = it },
+                        label = { Text(stringResource(R.string.batch_number_label)) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("add_batch_number_input")
+                    )
+
+                    OutlinedTextField(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = textFieldColors,
+                        value = storageLocation,
+                        onValueChange = { storageLocation = it },
+                        label = { Text(stringResource(R.string.storage_location)) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    // If prefilled from OCR and not yet confirmed, require explicit expiry confirmation
+                    if (isOcrPrefilled && !ocrExpiryConfirmed) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFFFEF3C7))
+                                .clickable { ocrExpiryConfirmed = true }
+                                .padding(10.dp)
+                                .testTag("add_confirm_ocr_expiry_row"),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = ocrExpiryConfirmed,
+                                onCheckedChange = { ocrExpiryConfirmed = it }
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = stringResource(R.string.box_scan_confirm_expiry_named, selectedDateString),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF92400E)
+                            )
+                        }
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = needsRefrigeration,
+                            onCheckedChange = { needsRefrigeration = it }
+                        )
+                        Text(
+                            stringResource(R.string.needs_refrigeration),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    if (allCategories.isNotEmpty()) {
+                        Text(
+                            stringResource(R.string.categories),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold
+                        )
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            allCategories.forEach { category ->
+                                val isSelected = selectedCategories.contains(category.id)
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = {
+                                        selectedCategories = if (isSelected) {
+                                            selectedCategories - category.id
+                                        } else {
+                                            selectedCategories + category.id
+                                        }
+                                    },
+                                    label = { Text(category.getLocalizedName()) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    submissionErrorMessage?.let { errMsg ->
+                        Text(
+                            text = errMsg,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Button(
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = tradeName.isNotBlank() &&
+                            !isExpiryDateInvalid &&
+                            isDosageValid &&
+                            isRouteValid &&
+                            isQuantityValid &&
+                            (!isOcrPrefilled || ocrExpiryConfirmed),
+                        onClick = {
+                            val validDate = selectedLocalDate
+                            if (validDate == null || !ExpiryService.isValidNewMedicineExpiryDate(LocalDate.now(), validDate)) {
+                                submissionErrorMessage = context.getString(R.string.invalid_expiry_entry_error)
+                                return@Button
+                            }
+                            if (tradeName.isNotBlank() && (!isOcrPrefilled || ocrExpiryConfirmed)) {
+                                val storedExpiryMillis = ExpiryService.localDateToStoredExpiryMillis(validDate)
+                                val derivedUnit = when (form) {
+                                    formTablets -> "tablet"
+                                    formCapsules -> "capsule"
+                                    formSyrup -> "mL"
+                                    formDrops -> "drop"
+                                    formSpray -> "puff"
+                                    formCream -> "application"
+                                    formInjections -> "injection"
+                                    else -> defaultUnit
+                                }
+                                viewModel.insertMedicine(
+                                    tradeName = tradeName,
+                                    scientificName = scientificName.takeIf { it.isNotBlank() },
+                                    barcode = null,
+                                    form = form,
+                                    strength = strength.takeIf { it.isNotBlank() },
+                                    manufacturer = manufacturer.takeIf { it.isNotBlank() },
+                                    imagePath = null,
+                                    indications = indications.takeIf { it.isNotBlank() },
+                                    warnings = null,
+                                    quantity = parsedQuantity ?: 1.0,
+                                    unit = derivedUnit,
+                                    purchaseDate = System.currentTimeMillis(),
+                                    expiryDate = storedExpiryMillis,
+                                    batchNumber = batchNumber.takeIf { it.isNotBlank() },
+                                    storageLocation = storageLocation.takeIf { it.isNotBlank() },
+                                    needsRefrigeration = needsRefrigeration,
+                                    usageMode = "$effectiveDosageValue $derivedUnit ($effectiveRouteValue)",
+                                    userNotes = userNotes.takeIf { it.isNotBlank() },
+                                    categoryIds = selectedCategories,
+                                    refillClassification = refillClassification.key,
+                                    prescribedDosage = "$effectiveDosageValue $derivedUnit",
+                                    administrationRoute = effectiveRouteValue,
+                                    onValidationError = { err -> submissionErrorMessage = err },
+                                    onSuccess = { onSave() }
+                                )
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp)
+                            .testTag("save_medicine_button"),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Text(stringResource(R.string.save_medicine_button), color = MaterialTheme.colorScheme.onPrimary)
+                    }
+                }
             }
         }
     }

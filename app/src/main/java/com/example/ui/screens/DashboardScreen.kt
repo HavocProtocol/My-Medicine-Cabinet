@@ -37,15 +37,25 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.saveable.rememberSaveable
 import com.example.R
 import com.example.data.Medicine
+import com.example.safety.ExpiryService
+import com.example.safety.MedicineExpirationStatus
+import com.example.services.LocalLlmConfig
+import com.example.ui.theme.LocalOnThemeChanged
+import com.example.ui.theme.LocalThemeMode
 import com.example.ui.viewmodels.AppViewModel
 import java.text.SimpleDateFormat
 import java.util.*
@@ -57,7 +67,6 @@ fun DashboardScreen(
     onScanBox: () -> Unit = {},
     onSchedule: () -> Unit = {},
     onStatCardClick: (String) -> Unit = {},
-    onScan: () -> Unit,
     onCategories: () -> Unit,
     onPrint: () -> Unit,
     onSettings: () -> Unit,
@@ -65,22 +74,43 @@ fun DashboardScreen(
     onVoice: () -> Unit,
     onNotifications: () -> Unit,
     onTutorial: () -> Unit,
+    onNavigateToPremium: () -> Unit = {},
+    onNavigateToHelpCenter: () -> Unit = {},
     onMedicineClick: (Int) -> Unit = {},
+    onRefillNeeded: () -> Unit = {},
+    onOneTimeMedications: () -> Unit = {},
     viewModel: AppViewModel = viewModel()
 ) {
     val allMedicines by viewModel.allMedicines.collectAsState()
     val availableItems by viewModel.availableItems.collectAsState()
+    val expiringSoonItems by viewModel.expiringSoonItems.collectAsState()
     val expired by viewModel.expiredItems.collectAsState()
     val unreadAlerts by viewModel.unreadAlerts.collectAsState()
+    val currentTimeMillis by viewModel.currentTimeMillis.collectAsState()
+    val expiryWarningDays by viewModel.expiryWarningDays.collectAsState()
+    val refillEval by viewModel.refillEvaluation.collectAsState()
+    val isPremiumSubscribed by viewModel.isPremiumSubscribed.collectAsState()
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshExpirationStatuses()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     val totalCount = allMedicines.size
-    val thirtyDaysMillis = 30L * 24 * 60 * 60 * 1000
-    val expiringSoonCount = availableItems.count { (it.expiryDate - viewModel.nowTime) <= thirtyDaysMillis }
-    val expiredCount = expired.size
+    val expiringSoonCount = expiringSoonItems.map { it.medicineId }.distinct().size
+    val expiredCount = expired.map { it.medicineId }.distinct().size
     val context = LocalContext.current
     val unavailableMessage = stringResource(R.string.feature_unavailable)
 
-    var searchQuery by remember { mutableStateOf("") }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
     val dateFormatter = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
 
     val itemsByMedicineId = remember(availableItems, expired) {
@@ -98,7 +128,9 @@ fun DashboardScreen(
         }
     }
 
-    var menuExpanded by remember { mutableStateOf(false) }
+    var menuExpanded by rememberSaveable { mutableStateOf(false) }
+    val currentThemeMode = LocalThemeMode.current
+    val onThemeChanged = LocalOnThemeChanged.current
     BackHandler(enabled = menuExpanded) { menuExpanded = false }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -106,6 +138,7 @@ fun DashboardScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 16.dp)
         ) {
@@ -167,6 +200,7 @@ fun DashboardScreen(
                             .size(44.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .testTag("menu_open_button")
                     ) {
                         Icon(
                             Icons.Default.Menu,
@@ -294,6 +328,39 @@ fun DashboardScreen(
                 modifier = Modifier
                     .weight(1f)
                     .clickable { onStatCardClick("expired") }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Refill Needed & One-Time Medications Cards (Section 4.2 & 4.3)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            StatCard(
+                label = stringResource(R.string.refill_needed_title),
+                value = refillEval.refillNeeded.size,
+                bgColor = Color(0xFFFFF7ED),
+                contentColor = Color(0xFF9A3412),
+                icon = Icons.Default.Autorenew,
+                iconBg = Color(0xFFF97316).copy(alpha = 0.2f),
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("dashboard_refill_needed_card")
+                    .clickable { onRefillNeeded() }
+            )
+            StatCard(
+                label = stringResource(R.string.one_time_meds_title),
+                value = refillEval.oneTimeCompleted.size,
+                bgColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                icon = Icons.Default.CheckCircleOutline,
+                iconBg = MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f),
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("dashboard_one_time_card")
+                    .clickable { onOneTimeMedications() }
             )
         }
 
@@ -506,9 +573,86 @@ fun DashboardScreen(
                     MedicinePreviewCard(
                         medicine = med,
                         expiryDate = minExpiryDate,
-                        nowTime = viewModel.nowTime,
+                        nowTime = currentTimeMillis,
+                        warningDays = expiryWarningDays,
                         dateFormatter = dateFormatter,
                         onClick = { onMedicineClick(med.id) }
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Bottom of Home Page: Premium Subscription Promotional Box ONLY (Live Chat box is NOT displayed on Home page)
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onNavigateToPremium() }
+                .testTag("dashboard_premium_card"),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isPremiumSubscribed) Color(0xFFECFDF5) else Color(0xFFFFFBEB)
+            ),
+            border = BorderStroke(
+                1.dp,
+                if (isPremiumSubscribed) Color(0xFF10B981) else Color(0xFFF59E0B)
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.WorkspacePremium,
+                        contentDescription = null,
+                        tint = if (isPremiumSubscribed) Color(0xFF059669) else Color(0xFFD97706),
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (isPremiumSubscribed) stringResource(R.string.dashboard_premium_active) else stringResource(R.string.dashboard_go_premium),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = if (isPremiumSubscribed) Color(0xFF065F46) else Color(0xFF92400E),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = stringResource(R.string.dashboard_premium_sub),
+                            fontSize = 12.sp,
+                            color = if (isPremiumSubscribed) Color(0xFF047857) else Color(0xFFB45309)
+                        )
+                    }
+                }
+                Button(
+                    onClick = onNavigateToPremium,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isPremiumSubscribed) Color(0xFF059669) else Color(0xFFD97706)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("dashboard_premium_button")
+                ) {
+                    Icon(
+                        Icons.Default.WorkspacePremium,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isPremiumSubscribed) stringResource(R.string.settings_manage_premium_btn) else stringResource(R.string.settings_view_premium_btn),
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
@@ -542,6 +686,7 @@ fun DashboardScreen(
                 )
                 .statusBarsPadding()
                 .navigationBarsPadding()
+                .testTag("menu_overlay")
         ) {
             Column(
                 modifier = Modifier
@@ -586,6 +731,7 @@ fun DashboardScreen(
                             .size(42.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f))
+                            .testTag("menu_close_button")
                     ) {
                         Icon(
                             Icons.Default.Close,
@@ -849,15 +995,18 @@ fun DashboardScreen(
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
                 ) {
                     Column {
-                        // AI Voice Search (Unavailable)
+                        val badgePro = stringResource(R.string.badge_pro)
+                        val badgeProLocked = stringResource(R.string.badge_pro_locked)
+                        // AI Voice Search (Premium Feature)
                         ModernMenuItemRow(
-                            icon = Icons.Outlined.Mic,
-                            iconTint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                            icon = if (isPremiumSubscribed) Icons.Outlined.Mic else Icons.Outlined.Lock,
+                            iconTint = MaterialTheme.colorScheme.primary,
                             title = stringResource(R.string.ai_voice_search),
-                            badgeText = stringResource(R.string.unavailable_badge),
-                            enabled = false,
+                            badgeText = if (isPremiumSubscribed) badgePro else badgeProLocked,
+                            enabled = true,
                             onClick = {
-                                Toast.makeText(context, unavailableMessage, Toast.LENGTH_SHORT).show()
+                                menuExpanded = false
+                                onVoice()
                             }
                         )
                         HorizontalDivider(
@@ -865,33 +1014,158 @@ fun DashboardScreen(
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
 
-                        // Scan Barcode (Unavailable)
+                        // AI-Powered Online Medicine Search & Local LLM (Premium Feature)
                         ModernMenuItemRow(
-                            icon = Icons.Outlined.QrCodeScanner,
-                            iconTint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
-                            title = stringResource(R.string.scan_barcode),
-                            badgeText = stringResource(R.string.unavailable_badge),
-                            enabled = false,
-                            onClick = {
-                                Toast.makeText(context, unavailableMessage, Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                        HorizontalDivider(
-                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
-
-                        // AI Search (Unavailable)
-                        ModernMenuItemRow(
-                            icon = Icons.Outlined.AutoAwesome,
-                            iconTint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                            icon = if (isPremiumSubscribed) Icons.Outlined.AutoAwesome else Icons.Outlined.Lock,
+                            iconTint = MaterialTheme.colorScheme.primary,
                             title = stringResource(R.string.ai_search),
-                            badgeText = stringResource(R.string.unavailable_badge),
-                            enabled = false,
+                            badgeText = if (isPremiumSubscribed) badgePro else badgeProLocked,
+                            enabled = true,
                             onClick = {
-                                Toast.makeText(context, unavailableMessage, Toast.LENGTH_SHORT).show()
+                                menuExpanded = false
+                                onAISearch()
                             }
                         )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Menu Page: 1. Online Help Center & Live Chat Promotional Box (Top)
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            menuExpanded = false
+                            onNavigateToHelpCenter()
+                        }
+                        .testTag("menu_live_chat_box"),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                    ),
+                    border = BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.35f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.SupportAgent,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(30.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.menu_help_center_live_chat),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                                Text(
+                                    text = stringResource(R.string.settings_help_center_desc),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f)
+                                )
+                            }
+                        }
+                        Button(
+                            onClick = {
+                                menuExpanded = false
+                                onNavigateToHelpCenter()
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("menu_open_live_chat_button")
+                        ) {
+                            Text(
+                                text = stringResource(R.string.settings_open_help_center_btn),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Menu Page: 2. Dedicated Premium Subscription Box (Below Online Help Center & Live Chat)
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            menuExpanded = false
+                            onNavigateToPremium()
+                        }
+                        .testTag("menu_premium_subscription_box"),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isPremiumSubscribed) Color(0xFFECFDF5) else Color(0xFFFFFBEB)
+                    ),
+                    border = BorderStroke(
+                        1.dp,
+                        if (isPremiumSubscribed) Color(0xFF10B981) else Color(0xFFF59E0B)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.WorkspacePremium,
+                                contentDescription = null,
+                                tint = if (isPremiumSubscribed) Color(0xFF059669) else Color(0xFFD97706),
+                                modifier = Modifier.size(30.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.menu_premium_subscription),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp,
+                                    color = if (isPremiumSubscribed) Color(0xFF065F46) else Color(0xFF92400E)
+                                )
+                                Text(
+                                    text = if (isPremiumSubscribed) {
+                                        stringResource(R.string.settings_hmc_premium_active_desc)
+                                    } else {
+                                        stringResource(R.string.settings_hmc_premium_free_desc)
+                                    },
+                                    fontSize = 12.sp,
+                                    color = if (isPremiumSubscribed) Color(0xFF047857) else Color(0xFFB45309)
+                                )
+                            }
+                        }
+                        Button(
+                            onClick = {
+                                menuExpanded = false
+                                onNavigateToPremium()
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isPremiumSubscribed) Color(0xFF059669) else Color(0xFFD97706)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("menu_open_premium_button")
+                        ) {
+                            Text(
+                                text = if (isPremiumSubscribed) stringResource(R.string.settings_manage_premium_btn) else stringResource(R.string.settings_view_premium_btn),
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
 
@@ -1312,19 +1586,20 @@ fun MedicinePreviewCard(
     medicine: Medicine,
     expiryDate: Long?,
     nowTime: Long,
+    warningDays: Int = ExpiryService.DEFAULT_WARNING_DAYS,
     dateFormatter: SimpleDateFormat,
     onClick: () -> Unit
 ) {
-    val thirtyDaysMillis = 30L * 24 * 60 * 60 * 1000
+    val expStatus = expiryDate?.let { ExpiryService.evaluateExpirationStatusMillis(nowTime, it, warningDays) }
 
-    val (badgeText, badgeBg, badgeColor) = when {
-        expiryDate == null -> Triple("—", MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
-        expiryDate < nowTime -> Triple(stringResource(R.string.expired_badge), Color(0xFFFEE2E2), Color(0xFF991B1B))
-        (expiryDate - nowTime) <= thirtyDaysMillis -> {
-            val days = ((expiryDate - nowTime) / (24 * 60 * 60 * 1000)).toInt().coerceAtLeast(0)
-            Triple("$days d", Color(0xFFFEF3C7), Color(0xFF92400E))
+    val (badgeText, badgeBg, badgeColor) = when (expStatus) {
+        null -> Triple("—", MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
+        MedicineExpirationStatus.EXPIRED -> Triple(stringResource(R.string.expired_badge), Color(0xFFFEE2E2), Color(0xFF991B1B))
+        MedicineExpirationStatus.EXPIRING_SOON -> {
+            val days = ExpiryService.daysUntilMillis(nowTime, expiryDate).toInt().coerceAtLeast(1)
+            Triple(stringResource(R.string.days_short_format, days), Color(0xFFFEF3C7), Color(0xFF92400E))
         }
-        else -> Triple(stringResource(R.string.valid_badge), Color(0xFFD1FAE5), Color(0xFF065F46))
+        MedicineExpirationStatus.ACTIVE -> Triple(stringResource(R.string.valid_badge), Color(0xFFD1FAE5), Color(0xFF065F46))
     }
 
     val formIcon = when (medicine.form.lowercase().trim()) {

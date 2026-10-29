@@ -9,9 +9,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PictureAsPdf
-import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -65,7 +65,7 @@ fun TutorialScreen(onBack: () -> Unit) {
             )
 
             TutorialStepCard(
-                icon = Icons.Default.QrCodeScanner,
+                icon = Icons.Default.DocumentScanner,
                 title = stringResource(R.string.tut_add_med_title),
                 description = stringResource(R.string.tut_add_med_desc)
             )

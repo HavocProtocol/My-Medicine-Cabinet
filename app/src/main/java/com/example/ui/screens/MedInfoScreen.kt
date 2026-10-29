@@ -18,8 +18,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -27,6 +29,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.BuildConfig
 import com.example.R
+import com.example.services.LocalLlmConfig
+import com.example.services.OnlineMedicineSearchGate
+import com.example.services.PremiumAccessRequiredException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -51,10 +56,12 @@ fun MedInfoScreen(
     scientificName: String = "Paracetamol",
     source: String = "",
     lastUpdated: String = "",
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNavigateToPremium: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val isPremium by LocalLlmConfig.premiumSubscribedFlow.collectAsState()
 
     var question by remember { mutableStateOf("") }
     var answer by remember { mutableStateOf<String?>(null) }
@@ -64,8 +71,13 @@ fun MedInfoScreen(
     var onlineSources by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
     var isSearchingOnline by remember { mutableStateOf(false) }
     var searchErrorMessage by remember { mutableStateOf<String?>(null) }
+    var showPaywallModal by remember { mutableStateOf(false) }
 
     fun executeOnlineSearch() {
+        if (!OnlineMedicineSearchGate.canAccessOnlineSearch(context)) {
+            showPaywallModal = true
+            return
+        }
         coroutineScope.launch {
             isSearchingOnline = true
             searchErrorMessage = null
@@ -83,9 +95,54 @@ fun MedInfoScreen(
         }
     }
 
-    // Automatically trigger online search when opened
-    LaunchedEffect(medicineName, scientificName) {
-        executeOnlineSearch()
+    // Automatically trigger online search when opened if user is Premium
+    LaunchedEffect(medicineName, scientificName, isPremium) {
+        if (isPremium) {
+            executeOnlineSearch()
+        }
+    }
+
+    if (showPaywallModal && !isPremium) {
+        AlertDialog(
+            onDismissRequest = { showPaywallModal = false },
+            icon = {
+                Icon(
+                    Icons.Default.WorkspacePremium,
+                    contentDescription = null,
+                    tint = Color(0xFFD97706),
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(stringResource(R.string.ai_upgrade_to_premium_btn), fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text(
+                    stringResource(R.string.med_info_paywall_modal_desc),
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showPaywallModal = false
+                        if (onNavigateToPremium != null) {
+                            onNavigateToPremium()
+                        } else {
+                            LocalLlmConfig.setPremiumSubscribed(context, true)
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706))
+                ) {
+                    Text(stringResource(R.string.ai_activate_premium_btn), color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPaywallModal = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -99,12 +156,42 @@ fun MedInfoScreen(
                     actionIconContentColor = MaterialTheme.colorScheme.onSurface
                 ),
                 title = {
-                    Text(
-                        text = stringResource(R.string.med_info_title),
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.med_info_title),
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        Surface(
+                            color = if (isPremium) Color(0xFFDCFCE7) else Color(0xFFFEF3C7),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("med_info_premium_badge")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isPremium) Icons.Default.WorkspacePremium else Icons.Default.Lock,
+                                    contentDescription = null,
+                                    tint = if (isPremium) Color(0xFF166534) else Color(0xFFB45309),
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Text(
+                                    text = if (isPremium) stringResource(R.string.badge_premium) else stringResource(R.string.badge_pro),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = if (isPremium) Color(0xFF166534) else Color(0xFFB45309)
+                                )
+                            }
+                        }
+                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -120,7 +207,7 @@ fun MedInfoScreen(
                         enabled = !isSearchingOnline
                     ) {
                         Icon(
-                            Icons.Default.Refresh,
+                            if (isPremium) Icons.Default.Refresh else Icons.Default.Lock,
                             contentDescription = stringResource(R.string.refresh_online_info)
                         )
                     }
@@ -132,6 +219,7 @@ fun MedInfoScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -243,206 +331,278 @@ fun MedInfoScreen(
                 }
             }
 
-            // ONLINE MEDICINE SUMMARY CARD
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
-            ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+            if (!isPremium) {
+                // Premium Gate / Paywall Banner for Online Medicine Search
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("med_info_paywall_card"),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFBEB)),
+                    border = BorderStroke(1.5.dp, Color(0xFFF59E0B))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Default.Public,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = stringResource(R.string.online_info_summary_title),
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            )
-                        }
-
-                        if (isSearchingOnline) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    if (isSearchingOnline && onlineSummary == null) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(36.dp),
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.height(14.dp))
-                            Text(
-                                text = stringResource(R.string.searching_online),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    } else if (onlineSummary != null) {
-                        Text(
-                            text = onlineSummary!!,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            lineHeight = 22.sp
-                        )
-
-                        // Web Sources
-                        if (onlineSources.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(16.dp))
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = stringResource(R.string.sources),
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            onlineSources.forEach { (sourceTitle, sourceUrl) ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            try {
-                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(sourceUrl))
-                                                context.startActivity(intent)
-                                            } catch (_: Exception) {}
-                                        }
-                                        .padding(vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        Icons.Default.Language,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp),
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = sourceTitle.ifBlank { sourceUrl },
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0xFFFEF3C7)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Lock,
+                                    contentDescription = stringResource(R.string.ai_dialog_sub),
+                                    tint = Color(0xFFD97706)
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = stringResource(R.string.premium_feat_online_title),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp,
+                                    color = Color(0xFF92400E)
+                                )
+                                Text(
+                                    text = stringResource(R.string.med_info_paywall_card_sub),
+                                    fontSize = 12.sp,
+                                    color = Color(0xFFB45309)
+                                )
                             }
                         }
-                    } else if (searchErrorMessage != null) {
-                        Text(
-                            text = "${context.getString(R.string.connection_failed)}: $searchErrorMessage",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        TextButton(onClick = { executeOnlineSearch() }) {
-                            Text(stringResource(R.string.refresh_online_info))
+
+                        Button(
+                            onClick = {
+                                if (onNavigateToPremium != null) {
+                                    onNavigateToPremium()
+                                } else {
+                                    LocalLlmConfig.setPremiumSubscribed(context, true)
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("med_info_upgrade_button"),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706))
+                        ) {
+                            Icon(Icons.Default.WorkspacePremium, contentDescription = null, tint = Color.White)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.ai_upgrade_to_premium_btn), color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
-            }
+            } else {
+                // ONLINE MEDICINE SUMMARY CARD (Premium Users)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                ) {
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Public,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = stringResource(R.string.online_info_summary_title),
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                )
+                            }
 
-            // Q&A / ASK ABOUT THIS MEDICINE CARD
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Text(
-                        text = stringResource(R.string.ask_med_placeholder),
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    OutlinedTextField(
-                        value = question,
-                        onValueChange = { question = it },
-                        placeholder = { Text(stringResource(R.string.ask_med_placeholder)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.surface,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                        ),
-                        maxLines = 3
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        shape = RoundedCornerShape(12.dp),
-                        onClick = {
-                            if (question.isNotBlank()) {
-                                coroutineScope.launch {
-                                    isAskingQuestion = true
-                                    answer = null
-                                    try {
-                                        val langName = Locale.getDefault().displayLanguage.ifBlank { "English" }
-                                        val prompt = "Regarding the medication '$medicineName' ($scientificName), please answer this user question concisely and accurately in $langName: $question"
-                                        val (reply, _) = queryMedicineOnline(medicineName, scientificName, langName, context, promptOverride = prompt)
-                                        answer = reply
-                                    } catch (e: Exception) {
-                                        answer = "${context.getString(R.string.connection_failed)}: ${e.message}"
-                                    } finally {
-                                        isAskingQuestion = false
+                            if (isSearchingOnline) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        if (isSearchingOnline && onlineSummary == null) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(36.dp),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(14.dp))
+                                Text(
+                                    text = stringResource(R.string.searching_online),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        } else if (onlineSummary != null) {
+                            Text(
+                                text = onlineSummary!!,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                lineHeight = 22.sp
+                            )
+
+                            // Web Sources
+                            if (onlineSources.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = stringResource(R.string.sources),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                onlineSources.forEach { (sourceTitle, sourceUrl) ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                try {
+                                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(sourceUrl))
+                                                    context.startActivity(intent)
+                                                } catch (_: Exception) {}
+                                            }
+                                            .padding(vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Language,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = sourceTitle.ifBlank { sourceUrl },
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
                                     }
                                 }
                             }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !isAskingQuestion && question.isNotBlank()
-                    ) {
-                        if (isAskingQuestion) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                strokeWidth = 2.dp
+                        } else if (searchErrorMessage != null) {
+                            Text(
+                                text = "${context.getString(R.string.connection_failed)}: $searchErrorMessage",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error
                             )
-                        } else {
-                            Text(stringResource(R.string.send_question), color = MaterialTheme.colorScheme.onPrimary)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            TextButton(onClick = { executeOnlineSearch() }) {
+                                Text(stringResource(R.string.refresh_online_info))
+                            }
                         }
                     }
+                }
 
-                    AnimatedVisibility(visible = answer != null) {
-                        Column {
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                            ) {
-                                Text(
-                                    text = answer ?: "",
-                                    modifier = Modifier.padding(14.dp),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    lineHeight = 22.sp
+                // Q&A / ASK ABOUT THIS MEDICINE CARD (Premium Users)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Text(
+                            text = stringResource(R.string.ask_med_placeholder),
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = question,
+                            onValueChange = { question = it },
+                            placeholder = { Text(stringResource(R.string.ask_med_placeholder)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                            ),
+                            maxLines = 3
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            shape = RoundedCornerShape(12.dp),
+                            onClick = {
+                                if (!OnlineMedicineSearchGate.canAccessOnlineSearch(context)) {
+                                    showPaywallModal = true
+                                    return@Button
+                                }
+                                if (question.isNotBlank()) {
+                                    coroutineScope.launch {
+                                        isAskingQuestion = true
+                                        answer = null
+                                        try {
+                                            val langName = Locale.getDefault().displayLanguage.ifBlank { "English" }
+                                            val prompt = "Regarding the medication '$medicineName' ($scientificName), please answer this user question concisely and accurately in $langName: $question"
+                                            val (reply, _) = queryMedicineOnline(medicineName, scientificName, langName, context, promptOverride = prompt)
+                                            answer = reply
+                                        } catch (e: Exception) {
+                                            answer = "${context.getString(R.string.connection_failed)}: ${e.message}"
+                                        } finally {
+                                            isAskingQuestion = false
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !isAskingQuestion && question.isNotBlank()
+                        ) {
+                            if (isAskingQuestion) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    strokeWidth = 2.dp
                                 )
+                            } else {
+                                Text(stringResource(R.string.send_question), color = MaterialTheme.colorScheme.onPrimary)
+                            }
+                        }
+
+                        AnimatedVisibility(visible = answer != null) {
+                            Column {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                                ) {
+                                    Text(
+                                        text = answer ?: "",
+                                        modifier = Modifier.padding(14.dp),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        lineHeight = 22.sp
+                                    )
+                                }
                             }
                         }
                     }
@@ -454,7 +614,7 @@ fun MedInfoScreen(
 
 /**
  * Searches online using Gemini API with Google Search grounding tool.
- * Falls back to verified clinical knowledge base if offline or API key is absent.
+ * Enforces premium subscription validation at the service layer before any network request.
  */
 suspend fun queryMedicineOnline(
     medicineName: String,
@@ -463,6 +623,9 @@ suspend fun queryMedicineOnline(
     context: Context,
     promptOverride: String? = null
 ): Pair<String, List<Pair<String, String>>> = withContext(Dispatchers.IO) {
+    // Enforce backend/service-layer premium check so UI state alone cannot bypass it
+    OnlineMedicineSearchGate.requirePremiumAccess(LocalLlmConfig.isPremiumSubscribed(context))
+
     val apiKey = BuildConfig.GEMINI_API_KEY
     val defaultPrompt = """
         Search online for verified medical and pharmacological information about the medicine: "$medicineName" (Scientific / active ingredient: "$scientificName").
@@ -628,7 +791,7 @@ private fun buildDefaultMedicineSummary(medicineName: String, scientificName: St
             Soulagement des douleurs, réduction de la fièvre ou traitement ciblé selon la notice médicale.
             
             • Posologie habituelle :
-            Respectez la prescription médicale ou la notice officielle (généralement toutes les 4 à 8 heures selon les besoins), sans dépasser la dose journalière maximale.
+            Respectez la prescription médicale ou la notice officielle (généralement toutes les 4 à 8 heures selon les besoins), sans dépasser la dose journeraire maximale.
             
             • Précautions et mises en garde :
             Ne pas associer avec d'autres médicaments contenant la même molécule. Consultez un professionnel de santé en cas de grossesse, allaitement ou insuffisance hépatique/rénale.

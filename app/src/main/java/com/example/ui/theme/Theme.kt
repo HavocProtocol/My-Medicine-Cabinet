@@ -6,7 +6,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.compositionLocalOf
 
 val LightColorScheme = lightColorScheme(
     primary = LightPrimary,
@@ -52,13 +52,13 @@ val DarkColorScheme = darkColorScheme(
     outline = DarkOutline
 )
 
-val LocalThemeMode = staticCompositionLocalOf { 0 } // 0: System, 1: Light, 2: Dark
-val LocalOnThemeChanged = staticCompositionLocalOf<(Int) -> Unit> { {} }
+val LocalThemeMode = compositionLocalOf { 0 } // 0: System, 1: Light, 2: Dark
+val LocalOnThemeChanged = compositionLocalOf<(Int) -> Unit> { {} }
 
 @Composable
 fun MyApplicationTheme(
-    themeMode: Int = 0, // 0 = System, 1 = Light, 2 = Dark
-    onThemeChanged: (Int) -> Unit = {},
+    themeMode: Int = LocalThemeMode.current, // 0 = System, 1 = Light, 2 = Dark
+    onThemeChanged: (Int) -> Unit = LocalOnThemeChanged.current,
     content: @Composable () -> Unit
 ) {
     val isDark = when (themeMode) {

@@ -18,8 +18,11 @@ import kotlinx.coroutines.launch
     Alert::class,
     SourceReference::class,
     MedicationSchedule::class,
-    DoseRecord::class
-], version = 3, exportSchema = false)
+    DoseRecord::class,
+    SupportConversation::class,
+    SupportMessage::class,
+    ProcessedTelegramUpdate::class
+], version = 6, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun appDao(): AppDao
 
@@ -107,6 +110,90 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `medicines` ADD COLUMN `refillClassification` TEXT NOT NULL DEFAULT 'ONE_TIME'")
+                db.execSQL("ALTER TABLE `medicines` ADD COLUMN `prescribedDosage` TEXT")
+                db.execSQL("ALTER TABLE `medicines` ADD COLUMN `administrationRoute` TEXT")
+                db.execSQL("ALTER TABLE `medicines` ADD COLUMN `expirationStatus` TEXT NOT NULL DEFAULT 'ACTIVE'")
+            }
+        }
+
+        val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `support_conversations` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `conversationUid` TEXT NOT NULL,
+                        `userId` TEXT NOT NULL,
+                        `userReference` TEXT NOT NULL,
+                        `subject` TEXT NOT NULL,
+                        `status` TEXT NOT NULL,
+                        `telegramTopicId` INTEGER,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        `lastMessagePreview` TEXT
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_support_conversations_conversationUid` ON `support_conversations` (`conversationUid`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_support_conversations_userId` ON `support_conversations` (`userId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_support_conversations_status` ON `support_conversations` (`status`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_support_conversations_telegramTopicId` ON `support_conversations` (`telegramTopicId`)")
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `support_messages` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `conversationId` INTEGER NOT NULL,
+                        `conversationUid` TEXT NOT NULL,
+                        `userId` TEXT NOT NULL,
+                        `senderType` TEXT NOT NULL,
+                        `senderName` TEXT,
+                        `senderTelegramUserId` INTEGER,
+                        `messageText` TEXT NOT NULL,
+                        `deliveryStatus` TEXT NOT NULL,
+                        `clientIdempotencyKey` TEXT NOT NULL,
+                        `telegramChatId` INTEGER,
+                        `telegramMessageId` INTEGER,
+                        `replyToTelegramMessageId` INTEGER,
+                        `telegramUpdateId` INTEGER,
+                        `errorMessage` TEXT,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_support_messages_conversationId` ON `support_messages` (`conversationId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_support_messages_conversationUid` ON `support_messages` (`conversationUid`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_support_messages_userId` ON `support_messages` (`userId`)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_support_messages_clientIdempotencyKey` ON `support_messages` (`clientIdempotencyKey`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_support_messages_telegramMessageId` ON `support_messages` (`telegramMessageId`)")
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `processed_telegram_updates` (
+                        `updateId` INTEGER NOT NULL,
+                        `telegramMessageId` INTEGER NOT NULL,
+                        `conversationUid` TEXT,
+                        `status` TEXT NOT NULL,
+                        `processedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`updateId`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_processed_telegram_updates_telegramMessageId` ON `processed_telegram_updates` (`telegramMessageId`)")
+            }
+        }
+
+        val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `support_conversations` ADD COLUMN `telegramTopicId` INTEGER")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_support_conversations_telegramTopicId` ON `support_conversations` (`telegramTopicId`)")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -114,7 +201,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "dawaey_database"
                 )
-                .addMigrations(MIGRATION_2_3)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .addCallback(DatabaseCallback(context.applicationContext))
                 .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()

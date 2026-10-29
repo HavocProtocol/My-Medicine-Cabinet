@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.R
+import com.example.safety.ExpiryService
+import com.example.safety.MedicineExpirationStatus
 import com.example.ui.viewmodels.AppViewModel
 import java.text.SimpleDateFormat
 import java.util.*
@@ -37,13 +39,18 @@ fun MedicineListScreen(
 ) {
     val allMedicines by viewModel.allMedicines.collectAsState()
     val availableItems by viewModel.availableItems.collectAsState()
+    val expiringSoonItems by viewModel.expiringSoonItems.collectAsState()
     val expiredItems by viewModel.expiredItems.collectAsState()
-    val currentTime = viewModel.nowTime
-    val thirtyDaysMillis = 30L * 24 * 60 * 60 * 1000
+    val currentTime by viewModel.currentTimeMillis.collectAsState()
+    val warningDays by viewModel.expiryWarningDays.collectAsState()
 
-    val filteredMedicines = remember(allMedicines, availableItems, expiredItems, filter) {
+    LaunchedEffect(Unit) {
+        viewModel.refreshExpirationStatuses()
+    }
+
+    val filteredMedicines = remember(allMedicines, availableItems, expiringSoonItems, expiredItems, filter) {
         val targetItems = when (filter) {
-            "expiring" -> availableItems.filter { (it.expiryDate - currentTime) <= thirtyDaysMillis }
+            "expiring" -> expiringSoonItems
             "expired" -> expiredItems
             else -> (availableItems + expiredItems)
         }
@@ -118,15 +125,18 @@ fun MedicineListScreen(
             ) {
                 items(filteredMedicines) { medicine ->
                     val minExpiryDate = itemsByMedicineId[medicine.id]?.minOfOrNull { it.expiryDate }
+                    val expStatus = minExpiryDate?.let {
+                        ExpiryService.evaluateExpirationStatusMillis(currentTime, it, warningDays)
+                    }
 
-                    val (badgeText, badgeBg, badgeColor) = when {
-                        minExpiryDate == null -> Triple("—", MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
-                        minExpiryDate < currentTime -> Triple(stringResource(R.string.expired_badge), Color(0xFFFEE2E2), Color(0xFF991B1B))
-                        (minExpiryDate - currentTime) <= thirtyDaysMillis -> {
-                            val days = ((minExpiryDate - currentTime) / (24 * 60 * 60 * 1000)).toInt().coerceAtLeast(0)
-                            Triple("$days d", Color(0xFFFEF3C7), Color(0xFF92400E))
+                    val (badgeText, badgeBg, badgeColor) = when (expStatus) {
+                        null -> Triple("—", MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
+                        MedicineExpirationStatus.EXPIRED -> Triple(stringResource(R.string.expired_badge), Color(0xFFFEE2E2), Color(0xFF991B1B))
+                        MedicineExpirationStatus.EXPIRING_SOON -> {
+                            val days = ExpiryService.daysUntilMillis(currentTime, minExpiryDate).toInt().coerceAtLeast(1)
+                            Triple(stringResource(R.string.days_short_format, days), Color(0xFFFEF3C7), Color(0xFF92400E))
                         }
-                        else -> Triple(stringResource(R.string.valid_badge), Color(0xFFD1FAE5), Color(0xFF065F46))
+                        MedicineExpirationStatus.ACTIVE -> Triple(stringResource(R.string.valid_badge), Color(0xFFD1FAE5), Color(0xFF065F46))
                     }
 
                     val formIcon = when (medicine.form.lowercase().trim()) {
