@@ -725,7 +725,7 @@ class PremiumAndSupportIntegrationTest {
         ).getOrThrow()
         assertEquals(firstConv.conversationUid, firstMsg.conversationUid)
 
-        // 2. User ends the Live Support session -> archives chat in Telegram, renames & closes topic
+        // 2. User ends the Live Support session -> closes conversation in app and locks Telegram topic without creating a chat summary
         val endResult = supportService.endActiveConversation(context, "user_gamma")
         assertTrue(endResult.isSuccess)
         val closedConv = endResult.getOrThrow()
@@ -733,20 +733,28 @@ class PremiumAndSupportIntegrationTest {
         assertEquals("CLOSED", closedConv!!.status)
         assertNotNull(closedConv.telegramTopicId)
 
-        // Verify Telegram Bot dispatched: (1) ticket initialization, (2) user message, (3) archived session transcript
-        assertEquals(3, fakeTransport.sentCalls.size)
-        val archiveCall = fakeTransport.sentCalls.last()
-        assertTrue(archiveCall.text.contains("ARCHIVED SUPPORT SESSION"))
-        assertTrue(archiveCall.text.contains(firstConv.conversationUid))
-        assertTrue(archiveCall.text.contains(firstConv.userReference))
-        assertTrue(archiveCall.text.contains("First session question"))
-        assertEquals(closedConv.telegramTopicId, archiveCall.messageThreadId)
+        // Verify NO duplicate chat summary or transcript archive message was generated or sent;
+        // only (1) ticket initialization and (2) the user's message exist in Telegram
+        assertEquals(2, fakeTransport.sentCalls.size)
+        assertFalse(
+            "Ending Live Chat must not generate or send a duplicate chat summary",
+            fakeTransport.sentCalls.any { it.text.contains("ARCHIVED SUPPORT SESSION", ignoreCase = true) }
+        )
 
-        // Verify the Forum Topic was renamed with [ARCHIVED] and closed for future reference
-        val renamedTitle = fakeTransport.editedTopics[closedConv.telegramTopicId!!]
-        assertNotNull(renamedTitle)
-        assertTrue(renamedTitle!!.contains("[ARCHIVED]"))
+        // Verify the complete conversation remains available in the ticket's Telegram topic & local history
+        assertTrue(fakeTransport.sentCalls.any { it.text.contains("First session question") && it.messageThreadId == closedConv.telegramTopicId })
+        val preservedMessages = dao.getSupportMessagesForConversationSnapshot(firstConv.id, "user_gamma")
+        assertEquals(1, preservedMessages.size)
+        assertEquals("First session question", preservedMessages.first().messageText)
+
+        // Verify the Forum Topic was locked/closed in Telegram
         assertTrue(closedConv.telegramTopicId!! in fakeTransport.closedTopics)
+
+        // Retrying the closing operation does not create duplicate records, send messages, or cause errors
+        val retryEndResult = supportService.endActiveConversation(context, "user_gamma")
+        assertTrue(retryEndResult.isSuccess)
+        assertNull(retryEndResult.getOrThrow())
+        assertEquals(2, fakeTransport.sentCalls.size)
 
         // 3. User opens Live Chat again -> receives a brand-new Live Chat ID and a brand-new Support ID
         val secondConv = supportService.getOrCreateActiveConversation(context, "user_gamma")

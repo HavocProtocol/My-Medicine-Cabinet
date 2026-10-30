@@ -112,18 +112,11 @@ fun PremiumSubscriptionScreen(
                 Button(
                     onClick = {
                         showCancelConfirmDialog = false
-                        val updatedState = PremiumEntitlementManager.cancelSubscription(
+                        PremiumEntitlementManager.cancelSubscription(
                             context = context
                         )
                         isFeedbackError = false
-                        val formattedExp = updatedState.renewsOrExpiresAtMillis?.let {
-                            dateFormatter.format(Date(it))
-                        }
-                        feedbackBannerMessage = if (!formattedExp.isNullOrBlank()) {
-                            context.getString(R.string.premium_status_cancelled_with_date_msg, formattedExp)
-                        } else {
-                            context.getString(R.string.premium_status_cancelled_msg)
-                        }
+                        feedbackBannerMessage = null
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error,
@@ -291,8 +284,22 @@ fun PremiumSubscriptionScreen(
                 dateFormatter = dateFormatter
             )
 
-            // Feedback / Error Banner
-            feedbackBannerMessage?.let { msg ->
+            // Feedback / Error / Cancellation Confirmation Banner (rendered once)
+            val cancellationConfirmationMessage = if (subscriptionState.status == SubscriptionStatus.CANCELLED) {
+                val formattedExp = subscriptionState.renewsOrExpiresAtMillis?.let {
+                    dateFormatter.format(Date(it))
+                }
+                if (!formattedExp.isNullOrBlank()) {
+                    stringResource(R.string.premium_status_cancelled_with_date_msg, formattedExp)
+                } else {
+                    stringResource(R.string.premium_status_cancelled_msg)
+                }
+            } else {
+                null
+            }
+            val effectiveBannerMessage = feedbackBannerMessage ?: cancellationConfirmationMessage
+
+            effectiveBannerMessage?.let { msg ->
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -774,28 +781,6 @@ fun PremiumSubscriptionScreen(
                                 color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.testTag("current_subscription_renewal_date")
                             )
-                        }
-
-                        if (subscriptionState.status == SubscriptionStatus.CANCELLED) {
-                            Surface(
-                                color = Color(0xFFFEF3C7),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("cancelled_period_end_notice")
-                            ) {
-                                Text(
-                                    text = if (subscriptionState.renewsOrExpiresAtMillis != null) {
-                                        stringResource(R.string.premium_status_cancelled_with_date_msg, renewalOrExpiryDisplay)
-                                    } else {
-                                        stringResource(R.string.premium_status_cancelled_msg)
-                                    },
-                                    fontSize = 12.sp,
-                                    color = Color(0xFF92400E),
-                                    lineHeight = 17.sp,
-                                    modifier = Modifier.padding(10.dp)
-                                )
-                            }
                         }
 
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))

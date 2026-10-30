@@ -396,10 +396,23 @@ class UiSubscriptionAndSafetyPreparationTest {
         assertFalse(canceledState.autoRenewEnabled)
         assertTrue("Canceled subscription must remain entitled until the paid period ends", canceledState.isEntitled())
         composeTestRule.onNodeWithTag("current_subscription_management_card").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("cancelled_period_end_notice").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("premium_feedback_banner").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("cancelled_period_end_notice").assertDoesNotExist()
+        composeTestRule.onAllNodesWithText(
+            "Subscription cancelled. Cancels at the end of the billing period",
+            substring = true
+        ).assertCountEquals(1)
         composeTestRule.onNodeWithTag("current_subscription_status")
             .assertTextContains("Cancels at the end of the billing period")
         composeTestRule.onNodeWithText("End Access Now", substring = true, ignoreCase = true).assertDoesNotExist()
+
+        // Refreshing subscription state / rerendering must still show the confirmation message only once
+        PremiumEntitlementManager.refreshSubscriptionState(context)
+        composeTestRule.waitForIdle()
+        composeTestRule.onAllNodesWithText(
+            "Subscription cancelled. Cancels at the end of the billing period",
+            substring = true
+        ).assertCountEquals(1)
 
         // D. Restore Purchase from Canceled state restores active auto-renewing status and marks isRestored = true
         composeTestRule.onNodeWithTag("premium_restore_button").performScrollTo().performClick()
@@ -782,6 +795,7 @@ class UiSubscriptionAndSafetyPreparationTest {
         }
     }
 
+    @Suppress("DEPRECATION")
     @Test
     fun test10_mobileKeyboardWindowSoftInputModeIsAdjustResize() {
         val pm = context.packageManager

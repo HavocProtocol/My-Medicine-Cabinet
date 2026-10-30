@@ -519,7 +519,7 @@ private fun TodayAndCalendarTab(
                             text = if (nextUpcomingDose != null) {
                                 stringResource(
                                     R.string.sched_next_reminder,
-                                    "${nextUpcomingDose.medicineName} (${formatAmount(nextUpcomingDose.configuredDosage)} ${nextUpcomingDose.dosageUnit})",
+                                    "${nextUpcomingDose.medicineName} (${formatAmount(nextUpcomingDose.configuredDosage)} ${getLocalizedUnit(nextUpcomingDose.dosageUnit, LocalContext.current)})",
                                     nextUpcomingDose.scheduledTimeHm
                                 )
                             } else {
@@ -1062,9 +1062,10 @@ private fun RoutinesTab(
                         }
                     }
 
+                    val unitCtx = LocalContext.current
                     Text(
                         text = slots.joinToString(" • ") { slot ->
-                            "${slot.timeHm} (${formatAmount(slot.dosage)} ${sched.dosageUnit})"
+                            "${slot.timeHm} (${formatAmount(slot.dosage)} ${getLocalizedUnit(sched.dosageUnit, unitCtx)})"
                         },
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,

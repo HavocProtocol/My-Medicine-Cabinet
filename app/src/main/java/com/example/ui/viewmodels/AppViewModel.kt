@@ -327,7 +327,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         val now = System.currentTimeMillis()
         if (!ExpiryService.isValidNewMedicineExpiryMillis(now, expiryDate)) {
-            onValidationError("Invalid expiry date. This medicine would already be expired on entry. Please select a future expiry date.")
+            onValidationError(getApplication<Application>().getString(R.string.invalid_expiry_entry_error))
             return
         }
         val normalizedClassification = MedicationRefillClassification.fromKey(refillClassification).key
@@ -444,6 +444,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val newQty = (currentQuantity - amountUsed).coerceAtLeast(0.0)
             dao.updateInventoryQuantity(inventoryItemId, newQty)
+            val inv = dao.getInventoryItemById(inventoryItemId)
+            if (inv != null) {
+                scheduleRepository.onMedicineInventoryUpdated(inv.medicineId)
+            }
             refreshExpirationStatuses()
             onComplete()
         }

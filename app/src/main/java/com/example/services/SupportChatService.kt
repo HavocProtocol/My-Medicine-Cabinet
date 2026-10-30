@@ -396,52 +396,6 @@ class SupportChatService(
         ): String {
             return formatSubsequentUserMessage(messageText)
         }
-
-        fun formatArchivedSessionTranscript(
-            conversation: SupportConversation,
-            messages: List<SupportMessage>,
-            endedAtMillis: Long
-        ): String {
-            val startedIso = DateTimeFormatter.ISO_INSTANT.format(
-                Instant.ofEpochMilli(conversation.createdAt).atOffset(ZoneOffset.UTC)
-            )
-            val endedIso = DateTimeFormatter.ISO_INSTANT.format(
-                Instant.ofEpochMilli(endedAtMillis).atOffset(ZoneOffset.UTC)
-            )
-            val fullText = buildString {
-                appendLine("🗄️ ARCHIVED SUPPORT SESSION")
-                appendLine("Conversation ID: ${conversation.conversationUid}")
-                appendLine("User Reference: ${conversation.userReference}")
-                appendLine("Session Started: $startedIso")
-                appendLine("Session Ended: $endedIso")
-                appendLine("Status: ARCHIVED (CLOSED)")
-                appendLine("Total Messages: ${messages.size}")
-                appendLine()
-                appendLine("--- Conversation Transcript ---")
-                if (messages.isEmpty()) {
-                    appendLine("(No messages sent in this session)")
-                } else {
-                    for (msg in messages) {
-                        val msgIso = DateTimeFormatter.ISO_INSTANT.format(
-                            Instant.ofEpochMilli(msg.createdAt).atOffset(ZoneOffset.UTC)
-                        )
-                        val speaker = if (msg.senderType == "USER") {
-                            "User (${conversation.userReference})"
-                        } else {
-                            msg.senderName ?: "Support Representative"
-                        }
-                        appendLine("[$msgIso] $speaker: ${msg.messageText}")
-                    }
-                }
-                appendLine("-------------------------------")
-                append("Archived by Home Medicine Cabinet Support Bot for future reference.")
-            }
-            return if (fullText.length > 3900) {
-                fullText.take(3850) + "\n...[Transcript truncated]"
-            } else {
-                fullText
-            }
-        }
     }
 
     /**
@@ -493,11 +447,9 @@ class SupportChatService(
     }
 
     /**
-     * Ends the user's current active Live Support session, archives the full conversation
-     * transcript in Telegram for future reference, renames the Telegram Forum Topic with an
-     * `[ARCHIVED]` prefix, and locks/closes the topic so it remains permanently accessible
-     * in Telegram. When the user opens Live Chat again, a new conversation with a new
-     * Live Chat ID and a new Support ID is created.
+     * Ends the user's current active Live Support session, marks the conversation as CLOSED in the app,
+     * and locks/closes the corresponding Telegram Forum Topic without generating or storing a duplicate
+     * chat summary. The complete conversation history remains preserved in its locked Telegram ticket topic.
      */
     suspend fun endActiveConversation(
         context: Context,
@@ -521,8 +473,6 @@ class SupportChatService(
         val active = dao.getActiveSupportConversationForUser(cleanUserId)
             ?: return@withLock Result.success(null)
 
-        val sessionMessages = dao.getSupportMessagesForConversationSnapshot(active.id, cleanUserId)
-
         val closedConversation = active.copy(
             status = "CLOSED",
             updatedAt = nowMillis
@@ -532,56 +482,10 @@ class SupportChatService(
         val config = configProvider()
         val supportChatId = config.supportChatId
         if (config.isConfigured() && supportChatId != null) {
-            var targetChatId = resolveTargetChatId(supportChatId)
+            val targetChatId = resolveTargetChatId(supportChatId)
             val topicId = active.telegramTopicId?.takeIf { it > 0 }
             if (topicId != null) {
-                val archiveSummaryText = formatArchivedSessionTranscript(
-                    conversation = closedConversation,
-                    messages = sessionMessages,
-                    endedAtMillis = nowMillis
-                )
-
-                // 1. Post the archived session summary & full transcript to the ticket's dedicated Telegram topic
-                runCatching {
-                    var archiveResp = transport.sendMessage(
-                        botToken = config.botToken,
-                        chatId = targetChatId,
-                        text = archiveSummaryText,
-                        messageThreadId = topicId
-                    )
-                    if (!archiveResp.ok && archiveResp.migratedToChatId != null) {
-                        val migratedId = archiveResp.migratedToChatId
-                        registerMigratedSupergroup(supportChatId, migratedId)
-                        targetChatId = migratedId
-                        archiveResp = transport.sendMessage(
-                            botToken = config.botToken,
-                            chatId = targetChatId,
-                            text = archiveSummaryText,
-                            messageThreadId = topicId
-                        )
-                    }
-                    if (!archiveResp.ok && supportChatId > 0 &&
-                        archiveResp.errorDescription?.contains("chat not found", ignoreCase = true) == true
-                    ) {
-                        targetChatId = resolveTargetChatId(-supportChatId)
-                        transport.sendMessage(
-                            botToken = config.botToken,
-                            chatId = targetChatId,
-                            text = archiveSummaryText,
-                            messageThreadId = topicId
-                        )
-                    }
-                }
-
-                // 2. Rename the dedicated Forum Topic to [ARCHIVED] and close/lock it
-                runCatching {
-                    transport.editForumTopic(
-                        botToken = config.botToken,
-                        chatId = targetChatId,
-                        messageThreadId = topicId,
-                        name = "🗄️ [ARCHIVED] ${active.conversationUid} • ${active.userReference}"
-                    )
-                }
+                // Lock/close the dedicated Forum Topic in Telegram while keeping its conversation history intact
                 runCatching {
                     transport.closeForumTopic(
                         botToken = config.botToken,

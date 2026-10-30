@@ -151,6 +151,46 @@ dependencies {
   "ksp"(libs.moshi.kotlin.codegen)
 }
 
+class SuppressKspAwtNpeAction : org.gradle.api.Action<org.gradle.api.Task>, java.io.Serializable {
+  override fun execute(task: org.gradle.api.Task) {
+    installHandler()
+  }
 
+  companion object {
+    fun installHandler() {
+      val current = Thread.getDefaultUncaughtExceptionHandler()
+      val handler = Thread.UncaughtExceptionHandler { thread, throwable ->
+        val isKspAwtNpe = thread.name.startsWith("AWT-EventQueue") &&
+          throwable is NullPointerException &&
+          (throwable.message?.contains("ksp.com.intellij.openapi.application.ApplicationManager.getApplication()") == true ||
+            throwable.stackTrace.any { it.className.startsWith("ksp.com.intellij.") })
+        if (!isKspAwtNpe) {
+          if (current != null && !current.javaClass.name.contains("SuppressKspAwtNpeAction")) {
+            current.uncaughtException(thread, throwable)
+          } else {
+            System.err.print("Exception in thread \"${thread.name}\" ")
+            throwable.printStackTrace(System.err)
+          }
+        }
+      }
+      if (current == null || !current.javaClass.name.contains("SuppressKspAwtNpeAction")) {
+        Thread.setDefaultUncaughtExceptionHandler(handler)
+      }
+      Thread.getAllStackTraces().keys
+        .filter { it.name.startsWith("AWT-EventQueue") }
+        .forEach { awtThread ->
+          val existing = awtThread.uncaughtExceptionHandler
+          if (existing == null || !existing.javaClass.name.contains("SuppressKspAwtNpeAction")) {
+            awtThread.uncaughtExceptionHandler = handler
+          }
+        }
+    }
+  }
+}
 
+SuppressKspAwtNpeAction.installHandler()
+
+tasks.matching { it.name.startsWith("ksp") }.configureEach {
+  doFirst(SuppressKspAwtNpeAction())
+}
 
